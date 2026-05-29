@@ -1,8 +1,10 @@
 
 import { initBulletinEditor, shouldLoadBulletinEditor } from './bulletin-editor/main';
+import { initTaskTracker } from './task-tracker/main';
 
 const commonModules = [
     'mediawiki.api',
+    'mediawiki.util',
 ];
 
 const bulletinEditorModules = [
@@ -13,14 +15,14 @@ const bulletinEditorModules = [
 ];
 
 async function init() {
+    await mw.loader.using(commonModules);
+    initTaskTracker();
+
     if (!shouldLoadBulletinEditor()) {
         return;
     }
 
-    await mw.loader.using([
-        ...commonModules,
-        ...bulletinEditorModules,
-    ]);
+    await mw.loader.using(bulletinEditorModules);
     initBulletinEditor();
 }
 
