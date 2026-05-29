@@ -1,5 +1,15 @@
-# zhwiki-noticeboard-tools
+# NoticeboardTools
 中文維基百科站務小工具。僅補充TW未有之功能。
+
+站內頁面：[NoticeboardTools](https://zh.wikipedia.org/wiki/User:SuperGrey/gadgets/NoticeboardTools)（[站內原始碼](https://zh.wikipedia.org/wiki/User:SuperGrey/gadgets/NoticeboardTools/main.js)）
+
+## 安裝
+
+於[Special:MyPage/common.js](https://zh.wikipedia.org/wiki/Special:MyPage/common.js)加入以下程式碼：
+
+```js
+importScript('User:SuperGrey/gadgets/NoticeboardTools/main.js'); // Backlink: [[User:SuperGrey/gadgets/NoticeboardTools]]
+```
 
 ## 上游
 
