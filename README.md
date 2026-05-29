@@ -1,4 +1,5 @@
 # NoticeboardTools
+
 中文維基百科站務小工具。僅補充TW未有之功能。
 
 站內頁面：[NoticeboardTools](https://zh.wikipedia.org/wiki/User:SuperGrey/gadgets/NoticeboardTools)（[站內原始碼](https://zh.wikipedia.org/wiki/User:SuperGrey/gadgets/NoticeboardTools/main.js)）
@@ -10,6 +11,21 @@
 ```js
 importScript('User:SuperGrey/gadgets/NoticeboardTools/main.js'); // Backlink: [[User:SuperGrey/gadgets/NoticeboardTools]]
 ```
+
+## 開發
+
+1. 從原始碼構建：
+
+   ```bash
+   npm install
+   npm run build
+   ```
+
+2. 構建後的程式碼位於`dist/bundled.js`。選擇以下一種方式運行此程式碼：
+
+   a. 直接將程式碼貼到開發人員工具控制台，回車運行。
+
+   b. 將程式碼複製到站內你的個人沙盒，然後於[Special:MyPage/common.js](https://zh.wikipedia.org/wiki/Special:MyPage/common.js)安裝。
 
 ## 上游
 
