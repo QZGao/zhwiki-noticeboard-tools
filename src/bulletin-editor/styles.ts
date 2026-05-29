@@ -49,13 +49,11 @@ export function injectStyles($wrapper: JQuery): void {
         #be-summary {
             width: 50%;
         }
-        .be-button {
-            margin-right: 3px;
+        .be-action-buttons {
+            margin: 0.5em 0;
         }
-        #be-publish {
-            color: #fff;
-            background-color: #36c;
-            border-color: #36c;
+        .be-action-buttons .oo-ui-widget {
+            margin-right: 4px;
         }
     `));
 }

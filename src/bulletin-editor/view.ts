@@ -160,34 +160,27 @@ function renderControls($wrapper: JQuery, actions: EditorActions): void {
     $wrapper.append($('<input>').attr('id', 'be-summary'));
     $wrapper.append($('<br>'));
 
-    $wrapper.append(
-        $('<button>')
-            .addClass('be-button')
-            .attr('id', 'be-preview')
-            .text(wgULS('公告栏预览', '公告欄預覽'))
-            .on('click', actions.previewPage),
-    );
-    $wrapper.append(
-        $('<button>')
-            .addClass('be-button')
-            .attr('id', 'be-diff-page')
-            .text(wgULS('公告栏差异', '公告欄差異'))
-            .on('click', actions.diffPage),
-    );
-    $wrapper.append(
-        $('<button>')
-            .addClass('be-button')
-            .attr('id', 'be-diff-archive')
-            .text(wgULS('存档差异', '存檔差異'))
-            .on('click', actions.diffArchive),
-    );
-    $wrapper.append(
-        $('<button>')
-            .addClass('be-button')
-            .attr('id', 'be-publish')
-            .text(wgULS('发布变更', '發布變更'))
-            .on('click', actions.savePage),
-    );
+    $('<div>')
+        .addClass('be-action-buttons')
+        .append(
+            createButton('be-preview', wgULS('公告栏预览', '公告欄預覽'), actions.previewPage),
+            createButton('be-diff-page', wgULS('公告栏差异', '公告欄差異'), actions.diffPage),
+            createButton('be-diff-archive', wgULS('存档差异', '存檔差異'), actions.diffArchive),
+            createButton('be-publish', wgULS('发布变更', '發布變更'), actions.savePage, ['primary', 'progressive']),
+        )
+        .appendTo($wrapper);
+}
+
+function createButton(
+    id: string,
+    label: string,
+    onClick: () => void,
+    flags?: OO.ui.ButtonWidget.ConfigOptions['flags'],
+): JQuery {
+    const button = new OO.ui.ButtonWidget({ label, flags });
+    button.$element.attr('id', id);
+    button.on('click', onClick);
+    return button.$element;
 }
 
 function renderPreviewBoxes($wrapper: JQuery, archiveTitle: string): void {

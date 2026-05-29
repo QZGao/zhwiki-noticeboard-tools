@@ -2,9 +2,14 @@
 import { initBulletinEditor, shouldLoadBulletinEditor } from './bulletin-editor/main';
 
 const commonModules = [
-    'ext.gadget.morebits',
     'mediawiki.api',
+];
+
+const bulletinEditorModules = [
+    'ext.gadget.morebits',
     'mediawiki.diff.styles',
+    'oojs-ui-core',
+    'oojs-ui-widgets',
 ];
 
 async function init() {
@@ -12,7 +17,10 @@ async function init() {
         return;
     }
 
-    await mw.loader.using(commonModules);
+    await mw.loader.using([
+        ...commonModules,
+        ...bulletinEditorModules,
+    ]);
     initBulletinEditor();
 }
 
