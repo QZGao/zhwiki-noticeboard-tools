@@ -267,8 +267,8 @@ export function createTaskTrackerApp(): object {
                     ? wgULS('（检测到已挂RfC）', '（檢測到已掛RfC）')
                     : wgULS('（检测到未挂RfC）', '（檢測到未掛RfC）');
             },
-            isDetectedMissingRfc(task: TrackedTask): boolean {
-                return this.rfcStatusByPageTitle[task.pageTitle] === false && task.hasRfc;
+            canOpenRfcEditor(task: TrackedTask): boolean {
+                return findCurrentPageSection(task.pageTitle) !== null;
             },
             async openRfcEditorForTask(task: TrackedTask): Promise<void> {
                 const section = findCurrentPageSection(task.pageTitle);

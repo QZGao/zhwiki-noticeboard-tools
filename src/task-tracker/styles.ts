@@ -152,9 +152,8 @@ export function injectTaskTrackerStyles(): void {
                 color: #b32424;
                 font-weight: 700;
             }
-            .ntt-rfc-mismatch__link {
-                color: inherit;
-                font-weight: 700;
+            .ntt-rfc-edit-link {
+                margin-left: 4px;
                 text-decoration: underline;
             }
             .ntt-empty {
