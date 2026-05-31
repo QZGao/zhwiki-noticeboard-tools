@@ -2,7 +2,6 @@ import { additionalNamespaces, inProgressLinkClass, linkGroupClass } from './con
 import { fetchAndAnalyseSection } from './api';
 import { openEditRFCDialog } from './dialog';
 import { getEditRfcGlobal } from './global';
-import { registerRfcEditorMessages } from './messages';
 import { injectRfcEditorStyles } from './styles';
 import type { RfcDialogData } from './types';
 
@@ -11,7 +10,6 @@ export function initRfcEditor(): void {
         return;
     }
 
-    registerRfcEditorMessages();
     injectRfcEditorStyles();
     exposePublicApi();
 
@@ -62,7 +60,7 @@ function addEditsectionLink($editsection: JQuery): void {
     const title = String(mw.config.get('wgPageName') || '');
     const $link = $('<a>')
         .attr('href', '#')
-        .text(mw.msg('edit-rfc-button'))
+        .text(wgULS('编辑RFC', '編輯RFC'))
         .on('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -81,14 +79,14 @@ async function handleLinkClick(
     section: string,
 ): Promise<void> {
     $link
-        .text(mw.msg('edit-rfc-button-inprogress'))
+        .text(wgULS('正在载入……', '正在載入……'))
         .addClass(inProgressLinkClass);
 
     try {
         await fetchAndOpenDialog(title, section);
     } finally {
         $link
-            .text(mw.msg('edit-rfc-button'))
+            .text(wgULS('编辑RFC', '編輯RFC'))
             .removeClass(inProgressLinkClass);
     }
 }
@@ -110,7 +108,7 @@ async function fetchAndOpenDialog(
     } catch (error) {
         console.error('Failed to fetch RFC section data:', error);
         mw.notify(
-            `${mw.msg('edit-rfc-fetch-fail')}${mw.msg('colon-separator')}${errorMessage(error)}`,
+            `${wgULS('无法载入章节资料', '無法載入章節資料')}${mw.msg('colon-separator')}${errorMessage(error)}`,
             { type: 'error' },
         );
     }

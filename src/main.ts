@@ -50,7 +50,7 @@ function createModuleLoader(modules: string[]): () => Promise<unknown> {
 
     return () => {
         if (!promise) {
-            promise = mw.loader.using(modules).catch((error: unknown) => {
+            promise = Promise.resolve(mw.loader.using(modules)).catch((error: unknown) => {
                 promise = null;
                 throw error;
             });
@@ -62,12 +62,12 @@ function createModuleLoader(modules: string[]): () => Promise<unknown> {
 
 function loadRfcSeparatorMessages(): Promise<unknown> {
     if (!rfcSeparatorMessagesPromise) {
-        rfcSeparatorMessagesPromise = new mw.Api()
-            .loadMessagesIfMissing(separatorMessageKeys)
-            .catch((error: unknown) => {
-                rfcSeparatorMessagesPromise = null;
-                throw error;
-            });
+        rfcSeparatorMessagesPromise = Promise.resolve(
+            new mw.Api().loadMessagesIfMissing(separatorMessageKeys),
+        ).catch((error: unknown) => {
+            rfcSeparatorMessagesPromise = null;
+            throw error;
+        });
     }
 
     return rfcSeparatorMessagesPromise;

@@ -26,6 +26,8 @@ type QueryResponse = {
     };
 };
 
+type ApiParams = Record<string, string | number | boolean | string[] | number[] | File | undefined>;
+
 export class WikiConfigClient {
     private readonly api = new mw.Api();
     readonly title = getConfigPageTitle();
@@ -94,7 +96,7 @@ export class WikiConfigClient {
             taskTracker: snapshot,
         };
 
-        const params: Record<string, unknown> = {
+        const params: ApiParams = {
             action: 'edit',
             title: remote.title,
             text: `${JSON.stringify(nextConfig, null, 2)}\n`,

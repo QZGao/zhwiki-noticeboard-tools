@@ -8,7 +8,11 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "jsx": "preserve"
+    "jsx": "preserve",
+		"types": [
+			"@types/node",
+			"types-mediawiki"
+		]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

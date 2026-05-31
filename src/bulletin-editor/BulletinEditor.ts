@@ -18,6 +18,8 @@ import {
     parseBulletinRows,
 } from './wikitext';
 
+type ApiParams = Record<string, string | number | boolean | string[] | number[] | File | undefined>;
+
 export class BulletinEditor {
     private readonly api = new mw.Api();
     private readonly date = new Morebits.date();
@@ -66,7 +68,7 @@ export class BulletinEditor {
     }
 
     private async loadBulletinText(editorText: string): Promise<void> {
-        const params: Record<string, unknown> = {
+        const params: ApiParams = {
             action: 'query',
             format: 'json',
             prop: 'revisions',

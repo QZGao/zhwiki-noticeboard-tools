@@ -1,6 +1,6 @@
 import { doEdit } from './api';
 import { isDryRun } from './global';
-import { rfcTopics } from './constants';
+import { rfcTopicOptions, rfcTopics } from './constants';
 import { RFC_EDITOR_TEMPLATE } from './template';
 import { addRFCTemplate, constructEditSummary } from './wikitext';
 import type { RfcDialogData } from './types';
@@ -32,47 +32,44 @@ export function createRfcEditorApp(): object {
         },
         computed: {
             dialogTitle(): string {
-                return mw.msg('edit-rfc-window-title');
+                return wgULS('编辑征求意见模板', '編輯徵求意見模板');
             },
             cancelLabel(): string {
-                return mw.msg('edit-rfc-window-cancel');
+                return wgULS('取消', '取消');
             },
             primaryAction(): Record<string, unknown> {
                 return {
-                    label: this.isSubmitting ? wgULS('提交中...', '提交中...') : mw.msg('edit-rfc-window-confirm'),
+                    label: this.isSubmitting ? wgULS('提交中...', '提交中...') : wgULS('提交', '提交'),
                     actionType: 'progressive',
                     disabled: this.isSubmitting || !this.dialogData,
                 };
             },
             defaultAction(): Record<string, unknown> {
                 return {
-                    label: mw.msg('edit-rfc-window-cancel'),
+                    label: wgULS('取消', '取消'),
                     disabled: this.isSubmitting,
                 };
             },
             topicOptions(): Array<{ value: string; label: string }> {
-                return rfcTopics.map((topic) => ({
-                    value: topic,
-                    label: this.topicLabel(topic),
-                }));
+                return [...rfcTopicOptions];
             },
             topicsLabel(): string {
-                return mw.msg('edit-rfc-field-topics-label');
+                return wgULS('所属议题', '所屬議題');
             },
             topicsHelp(): string {
-                return mw.msg('edit-rfc-field-topics-help');
+                return wgULS('本讨论应属于的征求意见主题', '本討論應屬於的徵求意見主題');
             },
             reasonLabel(): string {
-                return mw.msg('edit-rfc-field-reason-label');
+                return wgULS('修改征求意见话题的原因', '修改徵求意見話題的原因');
             },
             reasonHelp(): string {
-                return mw.msg('edit-rfc-field-reason-help');
+                return wgULS('显示於编辑摘要的额外资讯', '顯示於編輯摘要的額外資訊');
             },
             rfcidLabel(): string {
-                return mw.msg('edit-rfc-field-rfcid-label');
+                return wgULS('征求意见话题编号', '徵求意見話題編號');
             },
             rfcidHelp(): string {
-                return mw.msg('edit-rfc-field-rfcid-help');
+                return wgULS('由机器人填写的话题编号', '由機器人填寫的話題編號');
             },
             rfcidValue(): string {
                 return this.dialogData?.rfcid || '';
@@ -86,14 +83,23 @@ export function createRfcEditorApp(): object {
                 }
 
                 if (this.dialogData.topics.length === 0) {
-                    return mw.msg('edit-rfc-message-new-rfc');
+                    return wgULS(
+                        '此讨论尚未有征求意见模板。点按“提交”后，机器人将在十分钟内将此讨论加入征求意见系统。',
+                        '此討論尚未有徵求意見模板。點按「提交」後，機器人將會在十分鐘內將此討論加入徵求意見系統。',
+                    );
                 }
 
                 if (!this.dialogData.rfcid) {
-                    return mw.msg('edit-rfc-message-no-rfcid');
+                    return wgULS(
+                        '此讨论已有征求意见模板，但机器人尚未运行。本话题将在十分钟后自动加入征求意见系统。本表单将修改本讨论串所属于的议题。',
+                        '此討論已有徵求意見模板，但機器人尚未運行。本話題將在十分鐘後自動加入徵求意見系統。本表單將修改本討論串所屬於的議題。',
+                    );
                 }
 
-                return mw.msg('edit-rfc-message-has-rfcid');
+                return wgULS(
+                    '此讨论已有征求意见模板，且机器人已经运行。本表单将修改本讨论串所属于的议题，修改将于十分钟内应用。',
+                    '此討論已有徵求意見模板，且機器人已經運行。本表單將修改本討論串所屬於的議題，修改將於十分鐘內應用。',
+                );
             },
         },
         methods: {
@@ -119,7 +125,7 @@ export function createRfcEditorApp(): object {
                     const editSummary = constructEditSummary(data.topics, topics, this.reason);
 
                     if (newContent === data.content) {
-                        mw.notify(mw.msg('edit-rfc-notify-unchanged'), { type: 'warn' });
+                        mw.notify(wgULS('征求意见模板无修订，未应用编辑。', '徵求意見模板無修訂，未應用編輯。'), { type: 'warn' });
                         this.open = false;
                         return;
                     }
@@ -131,7 +137,7 @@ export function createRfcEditorApp(): object {
                             newContent,
                             editSummary,
                         });
-                        mw.notify(mw.msg('edit-rfc-notify-dryrun'), { type: 'info' });
+                        mw.notify(wgULS('试运行模式：编辑未提交。请在控制台查看详情。', '試運行模式：編輯未提交。請在主控臺查看詳情。'), { type: 'info' });
                         this.open = false;
                         return;
                     }
@@ -141,12 +147,17 @@ export function createRfcEditorApp(): object {
                         const error = (editStatus as { error: unknown }).error;
                         console.error('Edit failed:', error);
                         this.statusType = 'error';
-                        this.statusMessage = `${mw.msg('edit-rfc-notify-fail')}${mw.msg('colon-separator')}${this.errorMessage(error)}`;
+                        this.statusMessage = `${wgULS('无法更新征求意见模板', '無法更新徵求意見模板')}${mw.msg('colon-separator')}${this.errorMessage(error)}`;
                         mw.notify(this.statusMessage, { type: 'error' });
                         return;
                     }
 
-                    mw.notify(mw.msg(topics.length === 0 ? 'edit-rfc-notify-removed' : 'edit-rfc-notify-succeed'), { type: 'success' });
+                    mw.notify(
+                        topics.length === 0
+                            ? wgULS('征求意见模板已成功移除。', '徵求意見模板已成功移除。')
+                            : wgULS('征求意见模板已成功更新。', '徵求意見模板已成功更新。'),
+                        { type: 'success' },
+                    );
                     this.open = false;
                     this.reloadPage();
                 } finally {
@@ -155,11 +166,6 @@ export function createRfcEditorApp(): object {
             },
             normalizedSelectedTopics(): string[] {
                 return rfcTopics.filter((topic) => this.selectedTopics.includes(topic));
-            },
-            topicLabel(topic: string): string {
-                const key = `edit-rfc-topic-${topic}`;
-                const label = mw.msg(key);
-                return label === key ? topic : label;
             },
             reloadPage(): void {
                 const convenientDiscussions = (window as any).convenientDiscussions;

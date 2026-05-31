@@ -1,4 +1,4 @@
-import { rfcMatchRegex, skipMatchRegex } from './constants';
+import { rfcMatchRegex, rfcTopicLabel, skipMatchRegex, summarySuffix } from './constants';
 import type { RfcTemplateData } from './types';
 
 export function findRFCInSection(sectionText: string): RfcTemplateData | null {
@@ -63,24 +63,24 @@ export function constructEditSummary(oldTopics: string[], newTopics: string[], r
 
     let summary: string;
     if (newTopics.length === 0 && oldTopics.length > 0) {
-        summary = mw.msg('edit-rfc-summary-remove-template');
+        summary = wgULS('移除征求意见模板', '移除徵求意見模板');
     } else if (oldTopics.length === 0) {
-        summary = mw.msg('edit-rfc-summary-add-template')
+        summary = wgULS('新增征求意见模板', '新增徵求意見模板')
             + colonSeparator
-            + newTopics.map(topicLabel).join(commaSeparator);
+            + newTopics.map(rfcTopicLabel).join(commaSeparator);
     } else {
         const addedTopics = newTopics.filter((topic) => !oldTopics.includes(topic));
         const removedTopics = oldTopics.filter((topic) => !newTopics.includes(topic));
         const summaryParts: string[] = [];
 
         if (addedTopics.length > 0) {
-            summaryParts.push(`+${addedTopics.map(topicLabel).join(commaSeparator)}`);
+            summaryParts.push(`+${addedTopics.map(rfcTopicLabel).join(commaSeparator)}`);
         }
         if (removedTopics.length > 0) {
-            summaryParts.push(`-${removedTopics.map(topicLabel).join(commaSeparator)}`);
+            summaryParts.push(`-${removedTopics.map(rfcTopicLabel).join(commaSeparator)}`);
         }
 
-        summary = mw.msg('edit-rfc-summary-edit-template')
+        summary = wgULS('编辑征求意见模板', '編輯徵求意見模板')
             + colonSeparator
             + summaryParts.join(semicolonSeparator);
     }
@@ -90,11 +90,5 @@ export function constructEditSummary(oldTopics: string[], newTopics: string[], r
         summary += ` ${inParentheses(trimmedReason)}`;
     }
 
-    return `${summary} ${mw.msg('edit-rfc-summary-advertisement')}`;
-}
-
-function topicLabel(topic: string): string {
-    const key = `edit-rfc-topic-${topic}`;
-    const label = mw.msg(key);
-    return label === key ? topic : label;
+    return summary + summarySuffix;
 }
