@@ -11,9 +11,11 @@ type TaskTrackerInstance = {
 let instance: TaskTrackerInstance | null = null;
 let mountPromise: Promise<TaskTrackerInstance> | null = null;
 
-export function initTaskTracker(): void {
+export function initTaskTracker(shouldLoadEditsectionLinks: boolean): void {
     $(addPortletLink);
-    initEditsectionTrackingLinks(openTaskTrackerWithTask);
+    if (shouldLoadEditsectionLinks) {
+        initEditsectionTrackingLinks(openTaskTrackerWithTask);
+    }
 }
 
 function addPortletLink(): void {

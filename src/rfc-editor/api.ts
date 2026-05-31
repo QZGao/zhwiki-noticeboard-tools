@@ -43,6 +43,11 @@ export async function fetchAndAnalyseSection(title: string, section: string | nu
     };
 }
 
+export async function isSectionOnRfc(title: string, section: string | null): Promise<boolean> {
+    const analysis = await fetchAndAnalyseSection(title, section);
+    return analysis.topics.length > 0;
+}
+
 export async function doEdit(
     title: string,
     section: string | null,

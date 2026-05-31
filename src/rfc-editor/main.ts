@@ -1,30 +1,21 @@
-import { additionalNamespaces, inProgressLinkClass, linkGroupClass } from './constants';
-import { fetchAndAnalyseSection } from './api';
+import { inProgressLinkClass, linkGroupClass } from './constants';
 import { openEditRFCDialog } from './dialog';
 import { getEditRfcGlobal } from './global';
+import { openRfcEditorForSection } from './open';
 import { injectRfcEditorStyles } from './styles';
 import type { RfcDialogData } from './types';
 
-export function initRfcEditor(): void {
-    if (!shouldLoadRfcEditor()) {
-        return;
-    }
-
+export function initRfcEditor(shouldLoadEditsectionLinks: boolean): void {
     injectRfcEditorStyles();
     exposePublicApi();
+
+    if (!shouldLoadEditsectionLinks) {
+        return;
+    }
 
     mw.hook('wikipage.content').add(($content: JQuery) => {
         addEditsectionLinks($content);
     });
-}
-
-function shouldLoadRfcEditor(): boolean {
-    if (getEditRfcGlobal().loadAnywhere) {
-        return true;
-    }
-
-    const namespaceNumber = Number(mw.config.get('wgNamespaceNumber'));
-    return namespaceNumber % 2 === 1 || additionalNamespaces.has(namespaceNumber);
 }
 
 function exposePublicApi(): void {
@@ -96,15 +87,7 @@ async function fetchAndOpenDialog(
     section: string | null,
 ): Promise<void> {
     try {
-        const analysis = await fetchAndAnalyseSection(title, section);
-        openEditRFCDialog({
-            pagetitle: title,
-            section,
-            content: analysis.content,
-            revid: analysis.revid,
-            topics: analysis.topics,
-            rfcid: analysis.rfcid,
-        });
+        await openRfcEditorForSection(title, section);
     } catch (error) {
         console.error('Failed to fetch RFC section data:', error);
         mw.notify(

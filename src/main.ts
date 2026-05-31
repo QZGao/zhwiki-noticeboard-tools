@@ -21,6 +21,19 @@ const codexModules = [
     '@wikimedia/codex',
 ];
 
+const editsectionNamespaces = new Set([
+    1, // Talk
+    4, // Project / Wikipedia
+    5, // Project talk / Wikipedia talk
+    9, // MediaWiki talk
+    11, // Template talk
+    100, // Portal
+    101, // Portal talk
+    102, // WikiProject
+    103, // WikiProject talk
+    829, // Module talk
+]);
+
 const loadCommonModules = createModuleLoader(commonModules);
 const loadBulletinEditorModules = createModuleLoader(bulletinEditorModules);
 const loadCodexModules = createModuleLoader(codexModules);
@@ -32,8 +45,9 @@ async function init() {
     await loadCodexModules();
     await loadRfcSeparatorMessages();
 
-    initTaskTracker();
-    initRfcEditor();
+    const shouldLoadEditsectionFeatures = editsectionNamespaces.has(Number(mw.config.get('wgNamespaceNumber')));
+    initTaskTracker(shouldLoadEditsectionFeatures);
+    initRfcEditor(shouldLoadEditsectionFeatures);
 
     if (!shouldLoadBulletinEditor()) {
         return;

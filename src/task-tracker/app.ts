@@ -11,6 +11,9 @@ import { injectTaskTrackerStyles } from './styles';
 import { TASK_TRACKER_TEMPLATE } from './template';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 import { WikiConfigClient } from './wikiConfig';
+import { isSectionOnRfc } from '../rfc-editor/api';
+import { openRfcEditorForSection } from '../rfc-editor/open';
+import { currentPageTitle, findCurrentPageSection } from './pageSections';
 
 const wikiClient = new WikiConfigClient();
 
@@ -36,6 +39,8 @@ export function createTaskTrackerApp(): object {
                 hasLoaded: false,
                 loadPromise: null as Promise<void> | null,
                 editingTaskId: '',
+                rfcStatusByPageTitle: {} as Record<string, boolean | undefined>,
+                rfcStatusPromisesByPageTitle: {} as Record<string, Promise<void> | undefined>,
                 stageOptions: [
                     { value: 'proposal' as TaskStage, label: '提案' },
                     { value: 'publicNotice' as TaskStage, label: '公示' },
@@ -67,6 +72,7 @@ export function createTaskTrackerApp(): object {
             tasks: {
                 handler(): void {
                     this.persistLocalChange();
+                    this.refreshCurrentPageRfcStatuses();
                 },
                 deep: true,
             },
@@ -86,6 +92,7 @@ export function createTaskTrackerApp(): object {
                 const task = createTask(seed);
                 this.tasks.push(task);
                 this.editingTaskId = task.id;
+                this.refreshCurrentPageRfcStatuses();
             },
             ensureLoaded(): Promise<void> {
                 if (this.hasLoaded) {
@@ -144,6 +151,7 @@ export function createTaskTrackerApp(): object {
                 const task = createTask();
                 this.tasks.push(task);
                 this.editingTaskId = task.id;
+                this.refreshCurrentPageRfcStatuses();
             },
             openBulletinPage(): void {
                 const opened = window.open('https://zh.wikipedia.org/wiki/Template:Bulletin', '_blank', 'noopener,noreferrer');
@@ -156,6 +164,7 @@ export function createTaskTrackerApp(): object {
                 if (this.editingTaskId === id) {
                     this.editingTaskId = '';
                 }
+                this.refreshCurrentPageRfcStatuses();
             },
             async saveToWiki(): Promise<void> {
                 if (!wikiClient.canSave()) {
@@ -208,6 +217,7 @@ export function createTaskTrackerApp(): object {
                 this.tasks = snapshot.tasks.map((task) => ({ ...task }));
                 await this.$nextTick();
                 this.isHydrating = false;
+                this.refreshCurrentPageRfcStatuses();
             },
             currentSnapshot(): TaskTrackerSnapshot {
                 return createSnapshot(this.tasks, this.updatedAt || new Date().toISOString());
@@ -246,6 +256,62 @@ export function createTaskTrackerApp(): object {
             },
             stageLabel(stage: TaskStage): string {
                 return this.stageOptions.find((option: { value: TaskStage }) => option.value === stage)?.label || '提案';
+            },
+            rfcMismatchLabel(task: TrackedTask): string {
+                const detected = this.rfcStatusByPageTitle[task.pageTitle];
+                if (typeof detected !== 'boolean' || detected === task.hasRfc) {
+                    return '';
+                }
+
+                return detected
+                    ? wgULS('（检测到已挂RfC）', '（檢測到已掛RfC）')
+                    : wgULS('（检测到未挂RfC）', '（檢測到未掛RfC）');
+            },
+            isDetectedMissingRfc(task: TrackedTask): boolean {
+                return this.rfcStatusByPageTitle[task.pageTitle] === false && task.hasRfc;
+            },
+            async openRfcEditorForTask(task: TrackedTask): Promise<void> {
+                const section = findCurrentPageSection(task.pageTitle);
+                if (section === null) {
+                    this.statusMessage = wgULS('找不到对应章节，无法开启RfC编辑器', '找不到對應章節，無法開啟RfC編輯器');
+                    return;
+                }
+
+                try {
+                    this.open = false;
+                    await openRfcEditorForSection(currentPageTitle(), section);
+                } catch (error) {
+                    this.statusMessage = wgULS('无法开启RfC编辑器：', '無法開啟RfC編輯器：') + errorMessage(error);
+                    mw.notify(this.statusMessage, { type: 'error' });
+                }
+            },
+            refreshCurrentPageRfcStatuses(): void {
+                for (const task of this.tasks) {
+                    const section = findCurrentPageSection(task.pageTitle);
+                    if (section === null || this.rfcStatusByPageTitle[task.pageTitle] !== undefined) {
+                        continue;
+                    }
+
+                    void this.fetchCurrentPageRfcStatus(task.pageTitle, section);
+                }
+            },
+            async fetchCurrentPageRfcStatus(pageTitle: string, section: string): Promise<void> {
+                if (this.rfcStatusPromisesByPageTitle[pageTitle]) {
+                    return this.rfcStatusPromisesByPageTitle[pageTitle];
+                }
+
+                const promise = (async () => {
+                    try {
+                        this.rfcStatusByPageTitle[pageTitle] = await isSectionOnRfc(currentPageTitle(), section);
+                    } catch (error) {
+                        console.warn('Failed to detect RFC status for tracked task:', error);
+                    } finally {
+                        delete this.rfcStatusPromisesByPageTitle[pageTitle];
+                    }
+                })();
+
+                this.rfcStatusPromisesByPageTitle[pageTitle] = promise;
+                return promise;
             },
             isEditing(task: TrackedTask): boolean {
                 return this.editingTaskId === task.id;

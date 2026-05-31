@@ -17,7 +17,6 @@ export type RfcDialogData = RfcSectionAnalysis & {
 
 export type EditRfcGlobal = {
     dryrun?: boolean;
-    loadAnywhere?: boolean;
     editRFCDialog?: unknown;
     editRFCDialogInstance?: unknown;
     openEditRFCDialog?: (data: RfcDialogData) => Promise<void> | void;

@@ -19,7 +19,7 @@ export const TASK_TRACKER_TEMPLATE = `
                         weight="quiet"
                         @click.stop="openBulletinPage"
                     >
-                        ${wgULS('打开 {{Bulletin}}', '打開 {{Bulletin}}')}
+                        ${wgULS('打开', '打開')} <span v-pre>{{Bulletin}}</span>
                     </cdx-button>
                 </div>
             </div>
@@ -128,6 +128,21 @@ export const TASK_TRACKER_TEMPLATE = `
                         <label class="ntt-check">
                             <input v-model="task.hasRfc" type="checkbox" @click.stop>
                             ${wgULS('挂RfC', '掛RfC')}
+                            <strong
+                                v-if="rfcMismatchLabel(task)"
+                                class="ntt-rfc-mismatch"
+                            >
+                                <template v-if="isDetectedMissingRfc(task)">
+                                    ${wgULS('（检测到未挂RfC；', '（檢測到未掛RfC；')}<a
+                                        href="#"
+                                        class="ntt-rfc-mismatch__link"
+                                        @click.prevent.stop="openRfcEditorForTask(task)"
+                                    >${wgULS('编辑RfC', '編輯RfC')}</a>）
+                                </template>
+                                <template v-else>
+                                    {{ rfcMismatchLabel(task) }}
+                                </template>
+                            </strong>
                         </label>
                         <label class="ntt-check">
                             <input v-model="task.hasBulletin" type="checkbox" @click.stop>

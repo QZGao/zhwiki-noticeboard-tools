@@ -1,9 +1,3 @@
-export const additionalNamespaces = new Set([
-    4, // Project
-    100, // Portal
-    102, // WikiProject
-]);
-
 export const rfcTopicOptions = [
     { value: 'bio', label: wgULS('传记', '傳記') },
     { value: 'econ', label: wgULS('经济、贸易与公司', '經濟、貿易與公司') },
