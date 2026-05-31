@@ -14,6 +14,14 @@ export const TASK_TRACKER_TEMPLATE = `
             <div class="ntt-toolbar">
                 <cdx-button @click.stop="addTask">${wgULS('新增任务', '新增任務')}</cdx-button>
                 <span class="ntt-status">{{ statusMessage }}</span>
+                <div class="ntt-toolbar__actions">
+                    <cdx-button
+                        weight="quiet"
+                        @click.stop="openBulletinPage"
+                    >
+                        ${wgULS('打开 {{Bulletin}}', '打開 {{Bulletin}}')}
+                    </cdx-button>
+                </div>
             </div>
 
             <div v-if="tasks.length === 0" class="ntt-empty">

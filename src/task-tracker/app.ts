@@ -145,6 +145,12 @@ export function createTaskTrackerApp(): object {
                 this.tasks.push(task);
                 this.editingTaskId = task.id;
             },
+            openBulletinPage(): void {
+                const opened = window.open('https://zh.wikipedia.org/wiki/Template:Bulletin', '_blank', 'noopener,noreferrer');
+                if (opened) {
+                    opened.opener = null;
+                }
+            },
             removeTask(id: string): void {
                 this.tasks = this.tasks.filter((task: TrackedTask) => task.id !== id);
                 if (this.editingTaskId === id) {

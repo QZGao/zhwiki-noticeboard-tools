@@ -32,8 +32,17 @@ export function injectTaskTrackerStyles(): void {
             .ntt-status {
                 color: #54595d;
                 font-size: 0.875em;
+                flex: 1 1 auto;
                 min-width: 0;
                 overflow-wrap: anywhere;
+            }
+            .ntt-toolbar__actions {
+                display: flex;
+                flex: 0 0 auto;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+                gap: 4px;
+                margin-left: auto;
             }
             .ntt-task {
                 border: 1px solid #a2a9b1;
