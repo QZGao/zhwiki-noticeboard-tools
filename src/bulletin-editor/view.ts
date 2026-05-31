@@ -337,6 +337,12 @@ function moveToArchive(event: JQuery.ClickEvent): void {
     $('#be-archiveul').append(item);
 }
 
+function copyToArchive(item: JQuery, sourceRow: JQuery): void {
+    const archiveItem = createItem(valueAsString(item.find('.be-item-main').val()).trim());
+    copyDataFromParent(archiveItem, sourceRow);
+    $('#be-archiveul').append(archiveItem);
+}
+
 function copyDataFromParent(item: JQuery, row: JQuery): void {
     item.find('.be-item-type').val(row.find('.be-row-type').val() || '');
     item.find('.be-item-prefix').val(row.find('.be-row-prefix').val() || '');
@@ -361,8 +367,17 @@ function enableItemSorting($items: JQuery): void {
                 ui.item.addClass('be-moving');
             },
             stop: (_event: JQuery.Event, ui: { item: JQuery }) => {
-                if (oldList && $('#be-active-zone').has(oldList[0]).length && $('#be-archive-zone').has(ui.item[0]).length) {
-                    copyDataFromParent(ui.item, oldList.parents('.be-row'));
+                const newList = ui.item.parent();
+                if (oldList && $('#be-active-zone').has(oldList[0]).length) {
+                    const sourceRow = oldList.parents('.be-row');
+                    if ($('#be-archive-zone').has(ui.item[0]).length) {
+                        copyDataFromParent(ui.item, sourceRow);
+                    } else if (
+                        oldList[0] !== newList[0]
+                        && $('#be-active-zone').has(newList[0]).length
+                    ) {
+                        copyToArchive(ui.item, sourceRow);
+                    }
                 }
                 ui.item.removeClass('be-moving');
             },
