@@ -29,10 +29,13 @@ export const TASK_TRACKER_TEMPLATE = `
             </div>
 
             <section
-                v-for="task in tasks"
+                v-for="task in sortedTasks"
                 :key="task.id"
                 class="ntt-task"
-                :class="{ 'ntt-task--editing': isEditing(task) }"
+                :class="{
+                    'ntt-task--editing': isEditing(task),
+                    'ntt-task--closed': task.stage === 'closed'
+                }"
                 :data-task-id="task.id"
                 @click.stop="openTaskEditor(task.id)"
             >
@@ -58,7 +61,7 @@ export const TASK_TRACKER_TEMPLATE = `
                         <div class="ntt-task-flags">
                             <span v-if="task.hasRfc">RfC</span>
                             <span v-if="task.hasBulletin">${wgULS('公告栏', '公告欄')}</span>
-                            <span v-if="task.isPublicNotice">${wgULS('公示中', '公示中')}</span>
+                            <span v-if="task.isPublicNotice" class="ntt-task-flag--public-notice">${wgULS('公示中', '公示中')}</span>
                             <span v-if="task.isArchived">${wgULS('已存档', '已存檔')}</span>
                         </div>
                     </div>

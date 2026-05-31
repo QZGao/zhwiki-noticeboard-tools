@@ -60,6 +60,14 @@ export function injectTaskTrackerStyles(): void {
                 border-color: #36c;
                 background: #f8f9fa;
             }
+            .ntt-task--closed {
+                border-color: #c8ccd1;
+                background: #f8f9fa;
+                color: #72777d;
+            }
+            .ntt-task--closed:hover {
+                border-color: #a2a9b1;
+            }
             .ntt-task-summary {
                 display: flex;
                 align-items: center;
@@ -72,6 +80,9 @@ export function injectTaskTrackerStyles(): void {
             .ntt-task-summary__title {
                 font-weight: 600;
                 overflow-wrap: anywhere;
+            }
+            .ntt-task--closed .ntt-task-summary__title {
+                text-decoration: line-through;
             }
             .ntt-task-summary__note {
                 color: #54595d;
@@ -92,6 +103,11 @@ export function injectTaskTrackerStyles(): void {
                 padding: 1px 6px;
                 background: #fff;
                 color: #202122;
+            }
+            .ntt-task-flags .ntt-task-flag--public-notice {
+                border-color: #36c;
+                color: #36c;
+                font-weight: 700;
             }
             .ntt-task-editor {
                 cursor: default;

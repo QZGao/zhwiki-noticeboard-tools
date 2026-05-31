@@ -18,6 +18,11 @@ import { refreshEditsectionTrackingLinkLabels } from './editsectionLinks';
 import { currentPageTitle, findCurrentPageSection } from './pageSections';
 
 const wikiClient = new WikiConfigClient();
+const stageSortOrder: Record<TaskStage, number> = {
+    proposal: 0,
+    publicNotice: 1,
+    closed: 2,
+};
 
 export function createTaskTrackerApp(): object {
     return {
@@ -54,6 +59,12 @@ export function createTaskTrackerApp(): object {
             };
         },
         computed: {
+            sortedTasks(): TrackedTask[] {
+                return this.tasks
+                    .map((task: TrackedTask, index: number) => ({ task, index }))
+                    .sort(compareDisplayTasks)
+                    .map(({ task }: { task: TrackedTask }) => task);
+            },
             canSaveToWiki(): boolean {
                 return wikiClient.canSave();
             },
@@ -486,6 +497,32 @@ function findExistingTask(tasks: TrackedTask[], seed: TaskSeed): TrackedTask | n
     }
 
     return tasks.find((task) => task.pageTitle === seed.pageTitle) || null;
+}
+
+function compareDisplayTasks(
+    left: { task: TrackedTask; index: number },
+    right: { task: TrackedTask; index: number },
+): number {
+    const stageDifference = stageSortOrder[left.task.stage] - stageSortOrder[right.task.stage];
+    if (stageDifference !== 0) {
+        return stageDifference;
+    }
+
+    const dateDifference = createdAtSortValue(left.task.createdAt) - createdAtSortValue(right.task.createdAt);
+    if (dateDifference !== 0) {
+        return dateDifference;
+    }
+
+    return left.index - right.index;
+}
+
+function createdAtSortValue(dateString: string): number {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return Number.NEGATIVE_INFINITY;
+    }
+
+    const value = Date.parse(`${dateString}T00:00:00Z`);
+    return Number.isNaN(value) ? Number.NEGATIVE_INFINITY : value;
 }
 
 function encodeWikiTitle(pageTitle: string): string {
