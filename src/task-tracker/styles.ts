@@ -129,6 +129,10 @@ export function injectTaskTrackerStyles(): void {
                 font-size: 0.875em;
                 color: #54595d;
             }
+            .ntt-field-link {
+                margin-left: 6px;
+                font-weight: normal;
+            }
             .ntt-field input,
             .ntt-field select,
             .ntt-field textarea {

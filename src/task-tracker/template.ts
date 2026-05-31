@@ -107,7 +107,15 @@ export const TASK_TRACKER_TEMPLATE = `
 
                     <div class="ntt-grid">
                         <label class="ntt-field">
-                            <span>${wgULS('页面', '頁面')}</span>
+                            <span>
+                                ${wgULS('页面', '頁面')}
+                                <a
+                                    v-if="task.pageTitle"
+                                    href="#"
+                                    class="ntt-field-link"
+                                    @click.prevent.stop="openTaskPage(task)"
+                                >${wgULS('打开', '打開')}</a>
+                            </span>
                             <input v-model.trim="task.pageTitle" type="text" @click.stop>
                         </label>
                         <label class="ntt-field">

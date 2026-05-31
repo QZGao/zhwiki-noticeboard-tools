@@ -159,6 +159,17 @@ export function createTaskTrackerApp(): object {
                     opened.opener = null;
                 }
             },
+            openTaskPage(task: TrackedTask): void {
+                if (!task.pageTitle) {
+                    return;
+                }
+
+                const url = `https://zh.wikipedia.org/wiki/${encodeWikiTitle(task.pageTitle)}`;
+                const opened = window.open(url, '_blank', 'noopener,noreferrer');
+                if (opened) {
+                    opened.opener = null;
+                }
+            },
             removeTask(id: string): void {
                 this.tasks = this.tasks.filter((task: TrackedTask) => task.id !== id);
                 if (this.editingTaskId === id) {
@@ -401,4 +412,12 @@ function errorMessage(error: unknown): string {
 function isRaceError(error: unknown): boolean {
     const message = errorMessage(error);
     return /editconflict|articleexists|edit conflict/i.test(message);
+}
+
+function encodeWikiTitle(pageTitle: string): string {
+    return pageTitle
+        .replace(/ /g, '_')
+        .split('#')
+        .map(encodeURIComponent)
+        .join('#');
 }
