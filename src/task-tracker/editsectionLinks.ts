@@ -1,5 +1,6 @@
 import type { TaskSeed } from './types';
 import { isSectionOnRfc } from '../rfc-editor/api';
+import { loadLocalSnapshot } from './storage';
 import {
     cacheCurrentPageHeadingSections,
     currentPageTitle,
@@ -13,13 +14,25 @@ const LINK_CLASS = 'noticeboard-tools-add-proposal-tracking';
 const STYLE_ID = 'noticeboard-tools-editsection-link-style';
 
 type OpenWithTask = (seed: TaskSeed) => Promise<void>;
+type TrackedPage = { pageTitle: string };
+
+let trackedPageTitles = loadTrackedPageTitles();
 
 export function initEditsectionTrackingLinks(openWithTask: OpenWithTask): void {
     injectEditsectionStyle();
+    refreshEditsectionTrackingLinkLabels();
 
     mw.hook('wikipage.content').add(($content: JQuery) => {
         addEditsectionLinks($content, openWithTask);
     });
+}
+
+export function refreshEditsectionTrackingLinkLabels(tasks?: TrackedPage[]): void {
+    trackedPageTitles = tasks ? pageTitleSet(tasks) : loadTrackedPageTitles();
+
+    document
+        .querySelectorAll<HTMLAnchorElement>(`a.${LINK_CLASS}`)
+        .forEach((link) => updateLinkLabel(link, link.dataset.noticeboardToolsPageTitle || ''));
 }
 
 function addEditsectionLinks($root: JQuery, openWithTask: OpenWithTask): void {
@@ -35,7 +48,9 @@ function addEditsectionLinks($root: JQuery, openWithTask: OpenWithTask): void {
 }
 
 function addEditsectionLink(editsection: HTMLElement, openWithTask: OpenWithTask): void {
-    if (editsection.querySelector(`.${LINK_GROUP_CLASS}`)) {
+    const existingLink = editsection.querySelector<HTMLAnchorElement>(`a.${LINK_CLASS}`);
+    if (existingLink) {
+        updateLinkLabel(existingLink, existingLink.dataset.noticeboardToolsPageTitle || '');
         return;
     }
 
@@ -52,7 +67,8 @@ function addEditsectionLink(editsection: HTMLElement, openWithTask: OpenWithTask
     const link = document.createElement('a');
     link.className = LINK_CLASS;
     link.href = '#';
-    link.textContent = wgULS('加入提案追踪', '加入提案追蹤');
+    link.dataset.noticeboardToolsPageTitle = seed.pageTitle || '';
+    updateLinkLabel(link, seed.pageTitle || '');
     link.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -64,6 +80,12 @@ function addEditsectionLink(editsection: HTMLElement, openWithTask: OpenWithTask
     const brackets = editsection.querySelectorAll('span.mw-editsection-bracket');
     const closingBracket = brackets.length > 0 ? brackets[brackets.length - 1] : null;
     editsection.insertBefore(group, closingBracket);
+}
+
+function updateLinkLabel(link: HTMLAnchorElement, pageTitle: string): void {
+    link.textContent = trackedPageTitles.has(pageTitle)
+        ? wgULS('管理提案追踪', '管理提案追蹤')
+        : wgULS('加入提案追踪', '加入提案追蹤');
 }
 
 function createSeedFromHeading(heading: HTMLElement): TaskSeed {
@@ -127,4 +149,16 @@ function injectEditsectionStyle(): void {
             }
         `)
         .appendTo(document.head);
+}
+
+function loadTrackedPageTitles(): Set<string> {
+    return pageTitleSet(loadLocalSnapshot()?.tasks || []);
+}
+
+function pageTitleSet(tasks: TrackedPage[]): Set<string> {
+    return new Set(
+        tasks
+            .map((task) => task.pageTitle)
+            .filter((pageTitle) => pageTitle.length > 0),
+    );
 }

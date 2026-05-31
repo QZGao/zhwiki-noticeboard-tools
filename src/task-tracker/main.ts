@@ -5,7 +5,7 @@ import type { TaskSeed } from './types';
 
 type TaskTrackerInstance = {
     openDialog(): void;
-    addTaskAndOpen(seed: TaskSeed): Promise<void>;
+    addOrOpenTask(seed: TaskSeed): Promise<void>;
 };
 
 let instance: TaskTrackerInstance | null = null;
@@ -53,7 +53,7 @@ async function openTaskTracker(): Promise<void> {
 async function openTaskTrackerWithTask(seed: TaskSeed): Promise<void> {
     try {
         const tracker = await mountTaskTracker();
-        await tracker.addTaskAndOpen(seed);
+        await tracker.addOrOpenTask(seed);
     } catch (error) {
         mw.notify(wgULS('站务提案追踪器载入失败：', '站務提案追蹤器載入失敗：') + errorMessage(error), { type: 'error' });
     }

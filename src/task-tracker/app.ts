@@ -14,6 +14,7 @@ import { WikiConfigClient } from './wikiConfig';
 import { isSectionOnRfc } from '../rfc-editor/api';
 import { openRfcEditorForSection } from '../rfc-editor/open';
 import { fetchBulletinLinkedPageTitles, normalizeBulletinPageTitle } from './bulletinStatus';
+import { refreshEditsectionTrackingLinkLabels } from './editsectionLinks';
 import { currentPageTitle, findCurrentPageSection } from './pageSections';
 
 const wikiClient = new WikiConfigClient();
@@ -76,6 +77,7 @@ export function createTaskTrackerApp(): object {
             tasks: {
                 handler(): void {
                     this.persistLocalChange();
+                    refreshEditsectionTrackingLinkLabels(this.tasks);
                     this.refreshCurrentPageRfcStatuses();
                     this.refreshBulletinStatusesFromCache();
                 },
@@ -91,9 +93,20 @@ export function createTaskTrackerApp(): object {
                 this.open = true;
                 void this.ensureLoaded().then(() => this.refreshBulletinStatusesForDialogOpen());
             },
-            async addTaskAndOpen(seed: TaskSeed): Promise<void> {
+            async addOrOpenTask(seed: TaskSeed): Promise<void> {
                 this.open = true;
                 await this.ensureLoaded();
+                const existingTask = findExistingTask(this.tasks, seed);
+                if (existingTask) {
+                    if (typeof seed.hasRfc === 'boolean') {
+                        this.rfcStatusByPageTitle[existingTask.pageTitle] = seed.hasRfc;
+                    }
+                    this.editingTaskId = existingTask.id;
+                    this.refreshCurrentPageRfcStatuses();
+                    void this.refreshBulletinStatusesForDialogOpen();
+                    return;
+                }
+
                 const task = createTask(seed);
                 this.tasks.push(task);
                 this.editingTaskId = task.id;
@@ -234,6 +247,7 @@ export function createTaskTrackerApp(): object {
                 this.tasks = snapshot.tasks.map((task) => ({ ...task }));
                 await this.$nextTick();
                 this.isHydrating = false;
+                refreshEditsectionTrackingLinkLabels(this.tasks);
                 this.refreshCurrentPageRfcStatuses();
             },
             currentSnapshot(): TaskTrackerSnapshot {
@@ -342,7 +356,6 @@ export function createTaskTrackerApp(): object {
                 }
 
                 try {
-                    this.open = false;
                     await openRfcEditorForSection(currentPageTitle(), section);
                 } catch (error) {
                     this.statusMessage = wgULS('无法开启RfC编辑器：', '無法開啟RfC編輯器：') + errorMessage(error);
@@ -465,6 +478,14 @@ function errorMessage(error: unknown): string {
 function isRaceError(error: unknown): boolean {
     const message = errorMessage(error);
     return /editconflict|articleexists|edit conflict/i.test(message);
+}
+
+function findExistingTask(tasks: TrackedTask[], seed: TaskSeed): TrackedTask | null {
+    if (!seed.pageTitle) {
+        return null;
+    }
+
+    return tasks.find((task) => task.pageTitle === seed.pageTitle) || null;
 }
 
 function encodeWikiTitle(pageTitle: string): string {
