@@ -11,6 +11,7 @@ import {
 
 const LINK_GROUP_CLASS = 'noticeboard-tools-editsection-link-group';
 const LINK_CLASS = 'noticeboard-tools-add-proposal-tracking';
+const MANAGE_LINK_CLASS = 'noticeboard-tools-manage-proposal-tracking';
 const STYLE_ID = 'noticeboard-tools-editsection-link-style';
 
 type OpenWithTask = (seed: TaskSeed) => Promise<void>;
@@ -83,7 +84,9 @@ function addEditsectionLink(editsection: HTMLElement, openWithTask: OpenWithTask
 }
 
 function updateLinkLabel(link: HTMLAnchorElement, pageTitle: string): void {
-    link.textContent = trackedPageTitles.has(pageTitle)
+    const isTracked = trackedPageTitles.has(pageTitle);
+    link.classList.toggle(MANAGE_LINK_CLASS, isTracked);
+    link.textContent = isTracked
         ? wgULS('管理提案追踪', '管理提案追蹤')
         : wgULS('加入提案追踪', '加入提案追蹤');
 }
@@ -146,6 +149,10 @@ function injectEditsectionStyle(): void {
         .text(`
             .mw-editsection .${LINK_GROUP_CLASS}::before {
                 content: ' | ';
+            }
+
+            .mw-editsection .${MANAGE_LINK_CLASS} {
+                font-weight: bold;
             }
         `)
         .appendTo(document.head);
