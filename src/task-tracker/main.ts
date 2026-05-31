@@ -1,8 +1,11 @@
 import { PORTLET_LINK_ID, ROOT_ID } from './constants';
 import { createTaskTrackerApp } from './app';
+import { initEditsectionTrackingLinks } from './editsectionLinks';
+import type { TaskSeed } from './types';
 
 type TaskTrackerInstance = {
     openDialog(): void;
+    addTaskAndOpen(seed: TaskSeed): Promise<void>;
 };
 
 let instance: TaskTrackerInstance | null = null;
@@ -10,6 +13,7 @@ let mountPromise: Promise<TaskTrackerInstance> | null = null;
 
 export function initTaskTracker(): void {
     $(addPortletLink);
+    initEditsectionTrackingLinks(openTaskTrackerWithTask);
 }
 
 function addPortletLink(): void {
@@ -20,9 +24,9 @@ function addPortletLink(): void {
     const link = mw.util.addPortletLink(
         'p-tb',
         '#',
-        '站務提案追蹤',
+        wgULS('站务提案追踪', '站務提案追蹤'),
         PORTLET_LINK_ID,
-        '開啟站務提案追蹤器',
+        wgULS('开启站务提案追踪器', '開啟站務提案追蹤器'),
     );
 
     if (!link) {
@@ -40,7 +44,16 @@ async function openTaskTracker(): Promise<void> {
         const tracker = await mountTaskTracker();
         tracker.openDialog();
     } catch (error) {
-        mw.notify(`站務提案追蹤器載入失敗：${error instanceof Error ? error.message : String(error)}`, { type: 'error' });
+        mw.notify(wgULS('站务提案追踪器载入失败：', '站務提案追蹤器載入失敗：') + errorMessage(error), { type: 'error' });
+    }
+}
+
+async function openTaskTrackerWithTask(seed: TaskSeed): Promise<void> {
+    try {
+        const tracker = await mountTaskTracker();
+        await tracker.addTaskAndOpen(seed);
+    } catch (error) {
+        mw.notify(wgULS('站务提案追踪器载入失败：', '站務提案追蹤器載入失敗：') + errorMessage(error), { type: 'error' });
     }
 }
 
@@ -75,4 +88,8 @@ async function doMountTaskTracker(): Promise<TaskTrackerInstance> {
         .mount(container) as TaskTrackerInstance;
 
     return instance;
+}
+
+function errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
 }

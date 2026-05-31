@@ -15,6 +15,8 @@ export type TrackedTask = {
     notes: string;
 };
 
+export type TaskSeed = Partial<Omit<TrackedTask, 'id'>>;
+
 export type TaskTrackerSnapshot = {
     version: 1;
     updatedAt: string;

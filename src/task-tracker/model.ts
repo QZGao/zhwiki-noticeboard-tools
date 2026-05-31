@@ -1,10 +1,10 @@
 import { TASK_TRACKER_VERSION } from './constants';
-import type { TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
+import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 
 const stageValues = new Set<TaskStage>(['proposal', 'publicNotice', 'closed']);
 
-export function createTask(): TrackedTask {
-    return {
+export function createTask(seed: TaskSeed = {}): TrackedTask {
+    const task: TrackedTask = {
         id: createId(),
         title: '',
         pageTitle: mw.config.get('wgPageName')?.replace(/_/g, ' ') || '',
@@ -17,6 +17,11 @@ export function createTask(): TrackedTask {
         publicNoticeEnd: '',
         isArchived: false,
         notes: '',
+    };
+
+    return {
+        ...task,
+        ...seed,
     };
 }
 

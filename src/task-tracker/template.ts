@@ -2,8 +2,8 @@ export const TASK_TRACKER_TEMPLATE = `
     <cdx-dialog
         class="ntt-dialog"
         v-model:open="open"
-        title="站務提案追蹤"
-        close-button-label="關閉"
+        title="${wgULS('站务提案追踪', '站務提案追蹤')}"
+        close-button-label="${wgULS('关闭', '關閉')}"
         :use-close-button="true"
         :primary-action="primaryAction"
         :default-action="defaultAction"
@@ -12,12 +12,12 @@ export const TASK_TRACKER_TEMPLATE = `
     >
         <div class="ntt-task-tracker" @click="handleDialogContentClick">
             <div class="ntt-toolbar">
-                <cdx-button @click.stop="addTask">新增任務</cdx-button>
+                <cdx-button @click.stop="addTask">${wgULS('新增任务', '新增任務')}</cdx-button>
                 <span class="ntt-status">{{ statusMessage }}</span>
             </div>
 
             <div v-if="tasks.length === 0" class="ntt-empty">
-                尚未追蹤任何提案。
+                ${wgULS('尚未追踪任何提案。', '尚未追蹤任何提案。')}
             </div>
 
             <section
@@ -34,7 +34,7 @@ export const TASK_TRACKER_TEMPLATE = `
                 >
                     <div class="ntt-task-summary__main">
                         <div class="ntt-task-summary__title">
-                            {{ task.title || '未命名提案' }}
+                            {{ task.title || '${wgULS('未命名提案', '未命名提案')}' }}
                             <span v-if="task.notes" class="ntt-task-summary__note">
                                 （{{ task.notes }}）
                             </span>
@@ -49,27 +49,27 @@ export const TASK_TRACKER_TEMPLATE = `
                         </div>
                         <div class="ntt-task-flags">
                             <span v-if="task.hasRfc">RfC</span>
-                            <span v-if="task.hasBulletin">公告欄</span>
-                            <span v-if="task.isPublicNotice">公示中</span>
-                            <span v-if="task.isArchived">已存檔</span>
+                            <span v-if="task.hasBulletin">${wgULS('公告栏', '公告欄')}</span>
+                            <span v-if="task.isPublicNotice">${wgULS('公示中', '公示中')}</span>
+                            <span v-if="task.isArchived">${wgULS('已存档', '已存檔')}</span>
                         </div>
                     </div>
                     <cdx-button
                         weight="quiet"
                         @click.stop="openTaskEditor(task.id)"
                     >
-                        編輯
+                        ${wgULS('编辑', '編輯')}
                     </cdx-button>
                 </div>
 
                 <div v-else class="ntt-task-editor">
                     <div class="ntt-task__header">
                         <label class="ntt-field">
-                            <span>提案名稱</span>
+                            <span>${wgULS('提案名称', '提案名稱')}</span>
                             <input v-model.trim="task.title" type="text" @click.stop>
                         </label>
                         <label class="ntt-field">
-                            <span>階段</span>
+                            <span>${wgULS('阶段', '階段')}</span>
                             <select v-model="task.stage" @click.stop>
                                 <option
                                     v-for="stage in stageOptions"
@@ -85,33 +85,33 @@ export const TASK_TRACKER_TEMPLATE = `
                                 weight="quiet"
                                 @click.stop="closeTaskEditor"
                             >
-                                完成
+                                ${wgULS('完成', '完成')}
                             </cdx-button>
                             <cdx-button
                                 action="destructive"
                                 weight="quiet"
                                 @click.stop="removeTask(task.id)"
                             >
-                                移除
+                                ${wgULS('移除', '移除')}
                             </cdx-button>
                         </div>
                     </div>
 
                     <div class="ntt-grid">
                         <label class="ntt-field">
-                            <span>頁面</span>
+                            <span>${wgULS('页面', '頁面')}</span>
                             <input v-model.trim="task.pageTitle" type="text" @click.stop>
                         </label>
                         <label class="ntt-field">
-                            <span>發起日期</span>
+                            <span>${wgULS('发起日期', '發起日期')}</span>
                             <input v-model="task.createdAt" type="date" @click.stop>
                         </label>
                         <label class="ntt-field">
-                            <span>公示開始</span>
+                            <span>${wgULS('公示开始', '公示開始')}</span>
                             <input v-model="task.publicNoticeStart" type="date" @click.stop>
                         </label>
                         <label class="ntt-field">
-                            <span>公示結束</span>
+                            <span>${wgULS('公示结束', '公示結束')}</span>
                             <input v-model="task.publicNoticeEnd" type="date" @click.stop>
                         </label>
                     </div>
@@ -119,24 +119,24 @@ export const TASK_TRACKER_TEMPLATE = `
                     <div class="ntt-checks">
                         <label class="ntt-check">
                             <input v-model="task.hasRfc" type="checkbox" @click.stop>
-                            掛RfC
+                            ${wgULS('挂RfC', '掛RfC')}
                         </label>
                         <label class="ntt-check">
                             <input v-model="task.hasBulletin" type="checkbox" @click.stop>
-                            掛公告欄
+                            ${wgULS('挂公告栏', '掛公告欄')}
                         </label>
                         <label class="ntt-check">
                             <input v-model="task.isPublicNotice" type="checkbox" @click.stop>
-                            正在公示
+                            ${wgULS('正在公示', '正在公示')}
                         </label>
                         <label class="ntt-check">
                             <input v-model="task.isArchived" type="checkbox" @click.stop>
-                            已存檔
+                            ${wgULS('已存档', '已存檔')}
                         </label>
                     </div>
 
                     <label class="ntt-field">
-                        <span>備註</span>
+                        <span>${wgULS('备注', '備註')}</span>
                         <textarea v-model="task.notes" @click.stop></textarea>
                     </label>
 

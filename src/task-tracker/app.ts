@@ -9,7 +9,7 @@ import {
 import { loadLocalSnapshot, saveLocalSnapshot } from './storage';
 import { injectTaskTrackerStyles } from './styles';
 import { TASK_TRACKER_TEMPLATE } from './template';
-import type { TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
+import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 import { WikiConfigClient } from './wikiConfig';
 
 const wikiClient = new WikiConfigClient();
@@ -29,16 +29,17 @@ export function createTaskTrackerApp(): object {
                 open: false,
                 tasks: [] as TrackedTask[],
                 updatedAt: '',
-                statusMessage: '尚未載入',
+                statusMessage: wgULS('尚未载入', '尚未載入'),
                 isHydrating: false,
                 isLoading: false,
                 isSaving: false,
                 hasLoaded: false,
+                loadPromise: null as Promise<void> | null,
                 editingTaskId: '',
                 stageOptions: [
                     { value: 'proposal' as TaskStage, label: '提案' },
                     { value: 'publicNotice' as TaskStage, label: '公示' },
-                    { value: 'closed' as TaskStage, label: '結束' },
+                    { value: 'closed' as TaskStage, label: wgULS('结束', '結束') },
                 ],
             };
         },
@@ -51,14 +52,14 @@ export function createTaskTrackerApp(): object {
             },
             primaryAction(): Record<string, unknown> {
                 return {
-                    label: this.isSaving ? '儲存中...' : '儲存',
+                    label: this.isSaving ? wgULS('保存中...', '儲存中...') : wgULS('保存', '儲存'),
                     actionType: 'progressive',
                     disabled: this.isSaving || !this.canSaveToWiki,
                 };
             },
             defaultAction(): Record<string, unknown> {
                 return {
-                    label: '關閉',
+                    label: wgULS('关闭', '關閉'),
                 };
             },
         },
@@ -72,14 +73,32 @@ export function createTaskTrackerApp(): object {
         },
         mounted(): void {
             injectTaskTrackerStyles();
-            void this.loadInitialData();
+            void this.ensureLoaded();
         },
         methods: {
             openDialog(): void {
                 this.open = true;
-                if (!this.hasLoaded && !this.isLoading) {
-                    void this.loadInitialData();
+                void this.ensureLoaded();
+            },
+            async addTaskAndOpen(seed: TaskSeed): Promise<void> {
+                this.open = true;
+                await this.ensureLoaded();
+                const task = createTask(seed);
+                this.tasks.push(task);
+                this.editingTaskId = task.id;
+            },
+            ensureLoaded(): Promise<void> {
+                if (this.hasLoaded) {
+                    return Promise.resolve();
                 }
+
+                if (!this.loadPromise) {
+                    this.loadPromise = this.loadInitialData().finally(() => {
+                        this.loadPromise = null;
+                    });
+                }
+
+                return this.loadPromise;
             },
             async loadInitialData(): Promise<void> {
                 this.isLoading = true;
@@ -87,13 +106,13 @@ export function createTaskTrackerApp(): object {
 
                 if (localSnapshot) {
                     await this.applySnapshot(localSnapshot);
-                    this.statusMessage = '已載入暫存資料';
+                    this.statusMessage = wgULS('已载入暂存资料', '已載入暫存資料');
                 }
 
                 if (!wikiClient.canSave()) {
                     this.hasLoaded = true;
                     this.isLoading = false;
-                    this.statusMessage = '未登入，無法儲存';
+                    this.statusMessage = wgULS('未登录，无法保存', '未登入，無法儲存');
                     return;
                 }
 
@@ -106,17 +125,17 @@ export function createTaskTrackerApp(): object {
                         await this.applySnapshot(chosen.snapshot);
                         saveLocalSnapshot(chosen.snapshot);
                         this.statusMessage = chosen.source === 'remote'
-                            ? '已載入wiki資料'
-                            : '有尚未儲存的變更';
+                            ? wgULS('已载入wiki资料', '已載入wiki資料')
+                            : wgULS('有尚未保存的更改', '有尚未儲存的變更');
                     } else if (!localSnapshot) {
                         await this.applySnapshot(createSnapshot([]));
                         saveLocalSnapshot(this.currentSnapshot());
-                        this.statusMessage = '已建立空白追蹤清單';
+                        this.statusMessage = wgULS('已建立空白追踪清单', '已建立空白追蹤清單');
                     }
 
                     this.hasLoaded = true;
                 } catch (error) {
-                    this.statusMessage = `載入wiki資料失敗：${errorMessage(error)}`;
+                    this.statusMessage = wgULS('载入wiki资料失败：', '載入wiki資料失敗：') + errorMessage(error);
                 } finally {
                     this.isLoading = false;
                 }
@@ -134,7 +153,7 @@ export function createTaskTrackerApp(): object {
             },
             async saveToWiki(): Promise<void> {
                 if (!wikiClient.canSave()) {
-                    this.statusMessage = '未登入，無法儲存';
+                    this.statusMessage = wgULS('未登录，无法保存', '未登入，無法儲存');
                     return;
                 }
 
@@ -150,18 +169,18 @@ export function createTaskTrackerApp(): object {
                     if (result.ok === false) {
                         await this.applySnapshot(result.remoteSnapshot);
                         saveLocalSnapshot(result.remoteSnapshot);
-                        this.statusMessage = 'wiki資料較新，已載入wiki版本；未覆蓋';
+                        this.statusMessage = wgULS('wiki资料较新，已载入wiki版本；未覆盖', 'wiki資料較新，已載入wiki版本；未覆蓋');
                         return;
                     }
 
                     saveLocalSnapshot(snapshot);
-                    this.statusMessage = '已儲存';
+                    this.statusMessage = wgULS('已保存', '已儲存');
                 } catch (error) {
                     if (await this.handleSaveRace(snapshot, error)) {
                         return;
                     }
 
-                    this.statusMessage = `儲存失敗：${errorMessage(error)}`;
+                    this.statusMessage = wgULS('保存失败：', '儲存失敗：') + errorMessage(error);
                 } finally {
                     this.isSaving = false;
                 }
@@ -173,7 +192,9 @@ export function createTaskTrackerApp(): object {
 
                 this.updatedAt = new Date().toISOString();
                 const ok = saveLocalSnapshot(this.currentSnapshot());
-                this.statusMessage = ok ? '有尚未儲存的變更' : '暫存失敗，請儘快儲存';
+                this.statusMessage = ok
+                    ? wgULS('有尚未保存的更改', '有尚未儲存的變更')
+                    : wgULS('暂存失败，请尽快保存', '暫存失敗，請儘快儲存');
             },
             async applySnapshot(snapshot: TaskTrackerSnapshot): Promise<void> {
                 this.isHydrating = true;
@@ -188,10 +209,10 @@ export function createTaskTrackerApp(): object {
             proposalAgeLabel(task: TrackedTask): string {
                 const days = daysSince(task.createdAt);
                 if (days === null) {
-                    return '發起日期未設定';
+                    return wgULS('发起日期未设置', '發起日期未設定');
                 }
 
-                return days === 0 ? '今日發起' : `已發起 ${days} 日`;
+                return days === 0 ? wgULS('今日发起', '今日發起') : wgULS(`已发起 ${days} 日`, `已發起 ${days} 日`);
             },
             publicNoticeLabel(task: TrackedTask): string {
                 if (!task.isPublicNotice && !task.publicNoticeEnd) {
@@ -200,18 +221,18 @@ export function createTaskTrackerApp(): object {
 
                 const days = daysUntil(task.publicNoticeEnd);
                 if (days === null) {
-                    return '公示期限未設定';
+                    return wgULS('公示期限未设置', '公示期限未設定');
                 }
 
                 if (days < 0) {
-                    return `公示已逾期 ${Math.abs(days)} 日`;
+                    return wgULS(`公示已逾期 ${Math.abs(days)} 日`, `公示已逾期 ${Math.abs(days)} 日`);
                 }
 
                 if (days === 0) {
                     return '公示今日到期';
                 }
 
-                return `公示尚餘 ${days} 日`;
+                return wgULS(`公示尚余 ${days} 日`, `公示尚餘 ${days} 日`);
             },
             isPublicNoticeOverdue(task: TrackedTask): boolean {
                 const days = daysUntil(task.publicNoticeEnd);
@@ -251,14 +272,20 @@ export function createTaskTrackerApp(): object {
                     if (remoteSnapshot && compareTimestamps(remoteSnapshot.updatedAt, snapshot.updatedAt) > 0) {
                         await this.applySnapshot(remoteSnapshot);
                         saveLocalSnapshot(remoteSnapshot);
-                        this.statusMessage = '儲存時偵測到wiki資料較新，已載入wiki版本；未覆蓋';
+                        this.statusMessage = wgULS(
+                            '保存时检测到wiki资料较新，已载入wiki版本；未覆盖',
+                            '儲存時偵測到wiki資料較新，已載入wiki版本；未覆蓋',
+                        );
                     } else {
-                        this.statusMessage = '儲存時遇到編輯衝突；目前資料較新，請再按儲存重試';
+                        this.statusMessage = wgULS(
+                            '保存时遇到编辑冲突；目前资料较新，请再按保存重试',
+                            '儲存時遇到編輯衝突；目前資料較新，請再按儲存重試',
+                        );
                     }
 
                     return true;
                 } catch (loadError) {
-                    this.statusMessage = `儲存遇到衝突，且重新載入失敗：${errorMessage(loadError)}`;
+                    this.statusMessage = wgULS('保存遇到冲突，且重新载入失败：', '儲存遇到衝突，且重新載入失敗：') + errorMessage(loadError);
                     return true;
                 }
             },
