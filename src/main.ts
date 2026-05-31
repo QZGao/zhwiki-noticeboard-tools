@@ -1,5 +1,7 @@
 
 import { initBulletinEditor, shouldLoadBulletinEditor } from './bulletin-editor/main';
+import { separatorMessageKeys } from './rfc-editor/constants';
+import { initRfcEditor } from './rfc-editor/main';
 import { initTaskTracker } from './task-tracker/main';
 
 const commonModules = [
@@ -14,16 +16,59 @@ const bulletinEditorModules = [
     'oojs-ui-widgets',
 ];
 
+const codexModules = [
+    'vue',
+    '@wikimedia/codex',
+];
+
+const loadCommonModules = createModuleLoader(commonModules);
+const loadBulletinEditorModules = createModuleLoader(bulletinEditorModules);
+const loadCodexModules = createModuleLoader(codexModules);
+
+let rfcSeparatorMessagesPromise: Promise<unknown> | null = null;
+
 async function init() {
-    await mw.loader.using(commonModules);
+    await loadCommonModules();
+    await loadCodexModules();
+    await loadRfcSeparatorMessages();
+
     initTaskTracker();
+    initRfcEditor();
 
     if (!shouldLoadBulletinEditor()) {
         return;
     }
 
-    await mw.loader.using(bulletinEditorModules);
+    await loadBulletinEditorModules();
     initBulletinEditor();
 }
 
 void init();
+
+function createModuleLoader(modules: string[]): () => Promise<unknown> {
+    let promise: Promise<unknown> | null = null;
+
+    return () => {
+        if (!promise) {
+            promise = mw.loader.using(modules).catch((error: unknown) => {
+                promise = null;
+                throw error;
+            });
+        }
+
+        return promise;
+    };
+}
+
+function loadRfcSeparatorMessages(): Promise<unknown> {
+    if (!rfcSeparatorMessagesPromise) {
+        rfcSeparatorMessagesPromise = new mw.Api()
+            .loadMessagesIfMissing(separatorMessageKeys)
+            .catch((error: unknown) => {
+                rfcSeparatorMessagesPromise = null;
+                throw error;
+            });
+    }
+
+    return rfcSeparatorMessagesPromise;
+}

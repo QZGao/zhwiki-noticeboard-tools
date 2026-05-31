@@ -71,11 +71,6 @@ async function mountTaskTracker(): Promise<TaskTrackerInstance> {
 }
 
 async function doMountTaskTracker(): Promise<TaskTrackerInstance> {
-    await mw.loader.using([
-        'vue',
-        '@wikimedia/codex',
-    ]);
-
     const container = document.createElement('div');
     container.id = ROOT_ID;
     document.body.appendChild(container);
