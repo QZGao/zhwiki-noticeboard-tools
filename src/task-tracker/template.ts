@@ -152,6 +152,12 @@ export const TASK_TRACKER_TEMPLATE = `
                         <label class="ntt-check">
                             <input v-model="task.hasBulletin" type="checkbox" @click.stop>
                             ${wgULS('挂公告栏', '掛公告欄')}
+                            <strong
+                                v-if="bulletinMismatchLabel(task)"
+                                class="ntt-bulletin-mismatch"
+                            >
+                                {{ bulletinMismatchLabel(task) }}
+                            </strong>
                         </label>
                         <label class="ntt-check">
                             <input v-model="task.isPublicNotice" type="checkbox" @click.stop>

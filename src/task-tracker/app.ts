@@ -13,6 +13,7 @@ import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './ty
 import { WikiConfigClient } from './wikiConfig';
 import { isSectionOnRfc } from '../rfc-editor/api';
 import { openRfcEditorForSection } from '../rfc-editor/open';
+import { fetchBulletinLinkedPageTitles, normalizeBulletinPageTitle } from './bulletinStatus';
 import { currentPageTitle, findCurrentPageSection } from './pageSections';
 
 const wikiClient = new WikiConfigClient();
@@ -41,6 +42,9 @@ export function createTaskTrackerApp(): object {
                 editingTaskId: '',
                 rfcStatusByPageTitle: {} as Record<string, boolean | undefined>,
                 rfcStatusPromisesByPageTitle: {} as Record<string, Promise<void> | undefined>,
+                bulletinLinkedPageTitles: null as string[] | null,
+                bulletinStatusByPageTitle: {} as Record<string, boolean | undefined>,
+                bulletinStatusRefreshPromise: null as Promise<void> | null,
                 stageOptions: [
                     { value: 'proposal' as TaskStage, label: '提案' },
                     { value: 'publicNotice' as TaskStage, label: '公示' },
@@ -73,6 +77,7 @@ export function createTaskTrackerApp(): object {
                 handler(): void {
                     this.persistLocalChange();
                     this.refreshCurrentPageRfcStatuses();
+                    this.refreshBulletinStatusesFromCache();
                 },
                 deep: true,
             },
@@ -84,7 +89,7 @@ export function createTaskTrackerApp(): object {
         methods: {
             openDialog(): void {
                 this.open = true;
-                void this.ensureLoaded();
+                void this.ensureLoaded().then(() => this.refreshBulletinStatusesForDialogOpen());
             },
             async addTaskAndOpen(seed: TaskSeed): Promise<void> {
                 this.open = true;
@@ -93,6 +98,7 @@ export function createTaskTrackerApp(): object {
                 this.tasks.push(task);
                 this.editingTaskId = task.id;
                 this.refreshCurrentPageRfcStatuses();
+                void this.refreshBulletinStatusesForDialogOpen();
             },
             ensureLoaded(): Promise<void> {
                 if (this.hasLoaded) {
@@ -280,6 +286,53 @@ export function createTaskTrackerApp(): object {
             },
             canOpenRfcEditor(task: TrackedTask): boolean {
                 return findCurrentPageSection(task.pageTitle) !== null;
+            },
+            bulletinMismatchLabel(task: TrackedTask): string {
+                const detected = this.bulletinStatusByPageTitle[task.pageTitle];
+                if (typeof detected !== 'boolean' || detected === task.hasBulletin) {
+                    return '';
+                }
+
+                return detected
+                    ? wgULS('（检测到已挂公告栏）', '（檢測到已掛公告欄）')
+                    : wgULS('（检测到未挂公告栏）', '（檢測到未掛公告欄）');
+            },
+            async refreshBulletinStatusesForDialogOpen(): Promise<void> {
+                if (this.bulletinStatusRefreshPromise) {
+                    return this.bulletinStatusRefreshPromise;
+                }
+
+                this.bulletinLinkedPageTitles = null;
+                this.bulletinStatusByPageTitle = {};
+
+                const promise = (async () => {
+                    try {
+                        this.bulletinLinkedPageTitles = Array.from(await fetchBulletinLinkedPageTitles());
+                        this.refreshBulletinStatusesFromCache();
+                    } catch (error) {
+                        console.warn('Failed to detect Template:Bulletin status for tracked tasks:', error);
+                    } finally {
+                        this.bulletinStatusRefreshPromise = null;
+                    }
+                })();
+
+                this.bulletinStatusRefreshPromise = promise;
+                return promise;
+            },
+            refreshBulletinStatusesFromCache(): void {
+                if (!this.bulletinLinkedPageTitles) {
+                    return;
+                }
+
+                const linkedPageTitles = new Set(this.bulletinLinkedPageTitles);
+                const nextStatus: Record<string, boolean | undefined> = {};
+                for (const task of this.tasks) {
+                    if (task.pageTitle) {
+                        nextStatus[task.pageTitle] = linkedPageTitles.has(normalizeBulletinPageTitle(task.pageTitle));
+                    }
+                }
+
+                this.bulletinStatusByPageTitle = nextStatus;
             },
             async openRfcEditorForTask(task: TrackedTask): Promise<void> {
                 const section = findCurrentPageSection(task.pageTitle);
