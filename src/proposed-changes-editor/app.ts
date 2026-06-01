@@ -1,4 +1,10 @@
-import { fetchCurrentWikitext, fetchWikitextDiff, parseWikitext } from './api';
+import {
+    fetchCurrentWikitext,
+    fetchCurrentWikitextRevision,
+    fetchWikitextDiff,
+    parseWikitext,
+    saveWikitextRevision,
+} from './api';
 import {
     destroyCodeMirror,
     initializeCodeMirror,
@@ -37,6 +43,7 @@ export function createProposedChangesEditorApp(): object {
                 statusMessage: '',
                 statusType: 'info',
                 isLoading: false,
+                isSaving: false,
                 codeMirrorBinding: null as CodeMirrorBinding | null,
             };
         },
@@ -65,22 +72,22 @@ export function createProposedChangesEditorApp(): object {
                 }
 
                 return {
-                    label: wgULS('完成', '完成'),
+                    label: this.isSaving ? wgULS('保存中...', '儲存中...') : wgULS('保存', '儲存'),
                     actionType: 'progressive',
-                    disabled: this.isLoading,
+                    disabled: this.isLoading || this.isSaving || !this.options,
                 };
             },
             defaultAction(): Record<string, unknown> {
                 if (this.currentStep > 0) {
                     return {
                         label: wgULS('上一步', '上一步'),
-                        disabled: this.isLoading,
+                        disabled: this.isLoading || this.isSaving,
                     };
                 }
 
                 return {
                     label: wgULS('取消', '取消'),
-                    disabled: this.isLoading,
+                    disabled: this.isLoading || this.isSaving,
                 };
             },
         },
@@ -108,6 +115,7 @@ export function createProposedChangesEditorApp(): object {
                 this.statusMessage = '';
                 this.statusType = 'info';
                 this.isLoading = false;
+                this.isSaving = false;
                 this.open = true;
                 void this.$nextTick().then(() => this.initCodeMirror());
             },
@@ -146,7 +154,7 @@ export function createProposedChangesEditorApp(): object {
             },
             async onPrimaryAction(): Promise<void> {
                 if (this.currentStep === 2) {
-                    this.closeDialog();
+                    await this.saveChanges();
                     return;
                 }
 
@@ -160,6 +168,10 @@ export function createProposedChangesEditorApp(): object {
                 await this.showDiff();
             },
             onDefaultAction(): void {
+                if (this.isSaving) {
+                    return;
+                }
+
                 if (this.currentStep > 0) {
                     this.currentStep--;
                     return;
@@ -169,10 +181,20 @@ export function createProposedChangesEditorApp(): object {
             },
             onUpdateOpen(nextOpen: boolean): void {
                 if (!nextOpen) {
+                    if (this.isSaving) {
+                        this.open = true;
+                        return;
+                    }
+
                     this.closeDialog();
                 }
             },
-            closeDialog(): void {
+            closeDialog(force = false): void {
+                if (this.isSaving && !force) {
+                    this.open = true;
+                    return;
+                }
+
                 this.destroyCodeMirror();
                 this.open = false;
             },
@@ -213,6 +235,47 @@ export function createProposedChangesEditorApp(): object {
                     this.showError(wgULS('生成差异失败：', '產生差異失敗：') + this.errorMessage(error));
                 } finally {
                     this.isLoading = false;
+                }
+            },
+            async saveChanges(): Promise<void> {
+                if (!this.options || this.isSaving) {
+                    return;
+                }
+
+                this.isSaving = true;
+                this.statusType = 'info';
+                this.statusMessage = wgULS('保存中...', '儲存中...');
+                try {
+                    const section = placementSection(this.options.placement);
+                    const current = await fetchCurrentWikitextRevision(this.options.pageTitle, section);
+                    const placedWikitext = await buildPlacedWikitext(
+                        this.options.placement,
+                        current.content,
+                        this.proposedWikitext,
+                    );
+
+                    await saveWikitextRevision(
+                        this.options.pageTitle,
+                        current.resolvedSection,
+                        placedWikitext,
+                        this.options.editSummary || this.dialogTitle,
+                        current.basetimestamp,
+                        current.curtimestamp,
+                    );
+
+                    await this.options.onSaved?.({
+                        pageTitle: this.options.pageTitle,
+                        section: current.resolvedSection,
+                        proposedWikitext: this.proposedWikitext,
+                        placedWikitext,
+                    });
+
+                    this.isSaving = false;
+                    mw.notify(wgULS('已保存拟议变更。', '已儲存擬議變更。'), { type: 'success' });
+                    this.closeDialog(true);
+                } catch (error) {
+                    this.isSaving = false;
+                    this.showError(wgULS('保存失败：', '儲存失敗：') + this.errorMessage(error));
                 }
             },
             showError(message: string): void {

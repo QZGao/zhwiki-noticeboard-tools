@@ -55,6 +55,10 @@ export const PROPOSED_CHANGES_EDITOR_TEMPLATE = `
 
             <section v-else class="pcd-form-section">
                 <h3>${wgULS('差异', '差異')}</h3>
+                <div v-if="isSaving" class="pcd-saving" role="status" aria-live="polite">
+                    <span class="pcd-saving__spinner"></span>
+                    <span>${wgULS('保存中...', '儲存中...')}</span>
+                </div>
                 <div v-if="isLoading" class="pcd-muted">${wgULS('载入中...', '載入中...')}</div>
                 <div v-else-if="diffHtml === ''" class="pcd-muted">${wgULS('没有差异', '沒有差異')}</div>
                 <table v-else class="diff pcd-diff">

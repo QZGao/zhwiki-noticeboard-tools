@@ -25,6 +25,15 @@ export type ProposedChangesEditorOptions = {
     placement: ProposedChangesPlacement;
     initialWikitext?: string;
     dialogTitle?: string;
+    editSummary?: string;
+    onSaved?(data: ProposedChangesSavedData): void | Promise<void>;
+};
+
+export type ProposedChangesSavedData = {
+    pageTitle: string;
+    section: string | null;
+    proposedWikitext: string;
+    placedWikitext: string;
 };
 
 export type CodeMirrorRequire = (moduleName: string) => unknown;

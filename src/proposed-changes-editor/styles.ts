@@ -95,6 +95,31 @@ export function injectProposedChangesEditorStyles(): void {
             .pcd-muted {
                 color: #54595d;
             }
+            .pcd-saving {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 12px;
+                padding: 8px 12px;
+                border: 1px solid #a2a9b1;
+                background: #f8f9fa;
+                color: #202122;
+                font-weight: 600;
+            }
+            .pcd-saving__spinner {
+                box-sizing: border-box;
+                width: 16px;
+                height: 16px;
+                border: 2px solid #a2a9b1;
+                border-top-color: #36c;
+                border-radius: 50%;
+                animation: pcd-saving-spin 800ms linear infinite;
+            }
+            @keyframes pcd-saving-spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
             .pcd-preview {
                 border: 1px solid #a2a9b1;
                 padding: 12px;

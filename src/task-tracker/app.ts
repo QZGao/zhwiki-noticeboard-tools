@@ -5,12 +5,15 @@ import {
     daysSince,
     daysUntil,
     normalizeSnapshot,
+    today,
 } from './model';
 import { loadLocalSnapshot, saveLocalSnapshot } from './storage';
 import { injectTaskTrackerStyles } from './styles';
 import { TASK_TRACKER_TEMPLATE } from './template';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 import { WikiConfigClient } from './wikiConfig';
+import { openProposedChangesEditor } from '../proposed-changes-editor';
+import { summarySuffix } from './constants';
 import { isSectionOnRfc } from '../rfc-editor/api';
 import { openRfcEditorForSection } from '../rfc-editor/open';
 import { fetchBulletinLinkedPageTitles, normalizeBulletinPageTitle } from './bulletinStatus';
@@ -373,6 +376,30 @@ export function createTaskTrackerApp(): object {
                     mw.notify(this.statusMessage, { type: 'error' });
                 }
             },
+            openPublicNoticeMessageEditor(task: TrackedTask): void {
+                const target = targetFromTaskPageTitle(task.pageTitle);
+                if (!target) {
+                    this.statusMessage = wgULS('页面栏位需要包含章节锚点', '頁面欄位需要包含章節錨點');
+                    mw.notify(this.statusMessage, { type: 'error' });
+                    return;
+                }
+
+                openProposedChangesEditor({
+                    pageTitle: target.pageTitle,
+                    placement: {
+                        type: 'append-section-end',
+                        section: target.section,
+                    },
+                    initialWikitext: `: {{subst:Make public|7|content=${task.title}|end=yes}}。--~~~~`,
+                    dialogTitle: wgULS('发送公示留言', '發送公示留言'),
+                    editSummary: wgULS('发送公示留言', '發送公示留言') + summarySuffix,
+                    onSaved: (data) => {
+                        const startDate = today();
+                        task.publicNoticeStart = startDate;
+                        task.publicNoticeEnd = addDays(startDate, makePublicDays(data.proposedWikitext));
+                    },
+                });
+            },
             refreshCurrentPageRfcStatuses(): void {
                 for (const task of this.tasks) {
                     const section = findCurrentPageSection(task.pageTitle);
@@ -523,6 +550,44 @@ function createdAtSortValue(dateString: string): number {
 
     const value = Date.parse(`${dateString}T00:00:00Z`);
     return Number.isNaN(value) ? Number.NEGATIVE_INFINITY : value;
+}
+
+function targetFromTaskPageTitle(pageTitle: string): { pageTitle: string; section: string } | null {
+    const hashIndex = pageTitle.indexOf('#');
+    if (hashIndex === -1) {
+        return null;
+    }
+
+    const targetPageTitle = pageTitle.slice(0, hashIndex).trim();
+    const section = pageTitle.slice(hashIndex + 1).trim();
+    if (!targetPageTitle || !section) {
+        return null;
+    }
+
+    return {
+        pageTitle: targetPageTitle,
+        section,
+    };
+}
+
+function makePublicDays(wikitext: string): number {
+    const match = /{{\s*(?:subst:\s*)?Make[ _]public\s*\|\s*(\d+)/i.exec(wikitext);
+    if (!match) {
+        return 7;
+    }
+
+    const days = Number(match[1]);
+    return Number.isFinite(days) && days > 0 ? days : 7;
+}
+
+function addDays(dateString: string, days: number): string {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day + days);
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+    ].join('-');
 }
 
 function encodeWikiTitle(pageTitle: string): string {

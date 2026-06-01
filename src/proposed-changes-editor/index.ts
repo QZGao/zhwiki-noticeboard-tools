@@ -6,5 +6,6 @@ export type {
     ProposedChangesEditorOptions,
     ProposedChangesEditorResources,
     ProposedChangesPlacement,
+    ProposedChangesSavedData,
     SectionId,
 } from './types';

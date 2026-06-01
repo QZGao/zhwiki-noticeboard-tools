@@ -126,7 +126,15 @@ export const TASK_TRACKER_TEMPLATE = `
                             <input v-model="task.createdAt" type="date" @click.stop>
                         </label>
                         <label class="ntt-field">
-                            <span>${wgULS('公示开始', '公示開始')}</span>
+                            <span>
+                                ${wgULS('公示开始', '公示開始')}
+                                <a
+                                    v-if="task.pageTitle && !task.publicNoticeStart"
+                                    href="#"
+                                    class="ntt-field-link"
+                                    @click.prevent.stop="openPublicNoticeMessageEditor(task)"
+                                >${wgULS('发送「公示7日」留言', '發送「公示7日」留言')}</a>
+                            </span>
                             <input v-model="task.publicNoticeStart" type="date" @click.stop>
                         </label>
                         <label class="ntt-field">
