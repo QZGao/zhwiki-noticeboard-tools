@@ -45,6 +45,8 @@ export function createProposedChangesEditorApp(): object {
                 isLoading: false,
                 isSaving: false,
                 codeMirrorBinding: null as CodeMirrorBinding | null,
+                isInitializingCodeMirror: false,
+                codeMirrorGeneration: 0,
             };
         },
         computed: {
@@ -107,6 +109,7 @@ export function createProposedChangesEditorApp(): object {
         methods: {
             openDialog(options: ProposedChangesEditorOptions): void {
                 this.destroyCodeMirror();
+                this.codeMirrorGeneration++;
                 this.options = options;
                 this.currentStep = 0;
                 this.proposedWikitext = options.initialWikitext || '';
@@ -123,21 +126,46 @@ export function createProposedChangesEditorApp(): object {
                 this.proposedWikitext = (event.target as HTMLTextAreaElement).value;
             },
             async initCodeMirror(): Promise<void> {
-                if (!this.open || this.currentStep !== 0 || this.codeMirrorBinding) {
+                if (
+                    !this.open
+                    || this.currentStep !== 0
+                    || this.codeMirrorBinding
+                    || this.isInitializingCodeMirror
+                ) {
                     return;
                 }
 
+                const generation = this.codeMirrorGeneration;
                 const textarea = document.getElementById('pcd-raw-editor') as HTMLTextAreaElement | null;
                 if (!textarea) {
                     return;
                 }
 
                 textarea.value = this.proposedWikitext;
-                this.codeMirrorBinding = await initializeCodeMirror(textarea, (value) => {
-                    this.proposedWikitext = value;
-                });
+                this.isInitializingCodeMirror = true;
+                try {
+                    const binding = await initializeCodeMirror(textarea, (value) => {
+                        this.proposedWikitext = value;
+                    });
+                    if (
+                        generation !== this.codeMirrorGeneration
+                        || !this.open
+                        || this.currentStep !== 0
+                    ) {
+                        destroyCodeMirror(binding);
+                        return;
+                    }
+
+                    this.codeMirrorBinding = binding;
+                } finally {
+                    if (generation === this.codeMirrorGeneration) {
+                        this.isInitializingCodeMirror = false;
+                    }
+                }
             },
             destroyCodeMirror(): void {
+                this.codeMirrorGeneration++;
+                this.isInitializingCodeMirror = false;
                 destroyCodeMirror(this.codeMirrorBinding);
                 this.codeMirrorBinding = null;
             },
