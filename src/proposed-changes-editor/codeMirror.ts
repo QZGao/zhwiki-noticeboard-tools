@@ -44,7 +44,7 @@ export async function initializeCodeMirror(
         textarea.addEventListener('input', binding.onInput);
         return binding;
     } catch (error) {
-        console.warn('Failed to initialize CodeMirror for proposed changes editor:', error);
+        console.error('Failed to initialize CodeMirror for proposed changes editor:', error);
         return null;
     }
 }
@@ -62,6 +62,6 @@ export function destroyCodeMirror(binding: CodeMirrorBinding | null): void {
     try {
         binding.cm.destroy?.();
     } catch (error) {
-        console.warn('Failed to destroy CodeMirror for proposed changes editor:', error);
+        console.error('Failed to destroy CodeMirror for proposed changes editor:', error);
     }
 }

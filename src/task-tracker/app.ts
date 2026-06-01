@@ -175,6 +175,7 @@ export function createTaskTrackerApp(): object {
 
                     this.hasLoaded = true;
                 } catch (error) {
+                    console.error('Failed to load task tracker wiki data:', error);
                     this.statusMessage = wgULS('载入wiki资料失败：', '載入wiki資料失敗：') + errorMessage(error);
                 } finally {
                     this.isLoading = false;
@@ -239,6 +240,7 @@ export function createTaskTrackerApp(): object {
                         return;
                     }
 
+                    console.error('Failed to save task tracker wiki data:', error);
                     this.statusMessage = wgULS('保存失败：', '儲存失敗：') + errorMessage(error);
                 } finally {
                     this.isSaving = false;
@@ -372,6 +374,7 @@ export function createTaskTrackerApp(): object {
                 try {
                     await openRfcEditorForSection(currentPageTitle(), section);
                 } catch (error) {
+                    console.error('Failed to open RfC editor from task tracker:', error);
                     this.statusMessage = wgULS('无法开启RfC编辑器：', '無法開啟RfC編輯器：') + errorMessage(error);
                     mw.notify(this.statusMessage, { type: 'error' });
                 }
@@ -452,6 +455,7 @@ export function createTaskTrackerApp(): object {
                     return false;
                 }
 
+                console.error('Task tracker save hit an edit conflict:', error);
                 try {
                     const remote = await wikiClient.load();
                     const remoteSnapshot = remote ? normalizeSnapshot(remote.config.taskTracker) : null;
@@ -472,6 +476,7 @@ export function createTaskTrackerApp(): object {
 
                     return true;
                 } catch (loadError) {
+                    console.error('Failed to reload task tracker data after save conflict:', loadError);
                     this.statusMessage = wgULS('保存遇到冲突，且重新载入失败：', '儲存遇到衝突，且重新載入失敗：') + errorMessage(loadError);
                     return true;
                 }

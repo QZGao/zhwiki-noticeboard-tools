@@ -51,14 +51,15 @@ const api = new mw.Api();
 const sectionIndexCache = new Map<string, Promise<string>>();
 
 export async function parseWikitext(pageTitle: string, wikitext: string): Promise<string> {
-    const data = await api.post({
+    const data = await apiPost<ParseResponse>({
         action: 'parse',
         contentmodel: 'wikitext',
         text: wikitext,
         title: pageTitle,
         prop: 'text',
+        pst: true,
         formatversion: '2',
-    }) as ParseResponse;
+    });
 
     return data.parse.text;
 }
@@ -86,7 +87,7 @@ export async function fetchCurrentWikitextRevision(
         params.rvsection = resolvedSection;
     }
 
-    const data = await api.get(params) as QueryResponse;
+    const data = await apiGet<QueryResponse>(params);
     const page = data.query.pages[0];
     if (!page || page.missing) {
         throw new Error(wgULS('页面不存在', '頁面不存在'));
@@ -116,7 +117,7 @@ export async function fetchWikitextDiff(
         prop: 'revisions',
         titles: pageTitle,
         rvdifftotext: newWikitext,
-        rvslots: 'main',
+        rvdifftotextpst: true,
         formatversion: '2',
     };
 
@@ -124,7 +125,7 @@ export async function fetchWikitextDiff(
         params.rvsection = resolvedSection;
     }
 
-    const data = await api.post(params) as QueryResponse;
+    const data = await apiPost<QueryResponse>(params);
     return data.query.pages[0]?.revisions?.[0]?.diff?.body || '';
 }
 
@@ -157,7 +158,7 @@ export async function saveWikitextRevision(
         params.section = section;
     }
 
-    await api.postWithToken('csrf', params);
+    await apiPostWithToken(params);
 }
 
 async function resolveSectionIndex(pageTitle: string, section: SectionId | null): Promise<string | null> {
@@ -184,12 +185,12 @@ async function resolveSectionIndex(pageTitle: string, section: SectionId | null)
 }
 
 async function fetchSectionIndexByAnchor(pageTitle: string, anchor: string): Promise<string> {
-    const data = await api.get({
+    const data = await apiGet<SectionsResponse>({
         action: 'parse',
         page: pageTitle,
         prop: 'sections',
         formatversion: '2',
-    }) as SectionsResponse;
+    });
 
     const normalizedAnchor = normalizeSectionAnchor(anchor);
     const section = data.parse.sections.find((candidate) => {
@@ -217,4 +218,63 @@ function normalizeSectionAnchor(anchor: string): string {
 
 function revisionContent(revision: QueryResponse['query']['pages'][number]['revisions'][number]): string {
     return revision.content ?? revision.slots?.main?.content ?? revision.slots?.main?.['*'] ?? '';
+}
+
+function apiGet<T>(params: ApiParams): Promise<T> {
+    return apiRequest<T>('get', params);
+}
+
+function apiPost<T>(params: ApiParams): Promise<T> {
+    return apiRequest<T>('post', params);
+}
+
+function apiPostWithToken(params: ApiParams): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+        api.postWithToken('csrf', params)
+            .done((data: unknown) => resolve(data))
+            .fail((code: unknown, result: unknown) => {
+                reject(new MediaWikiApiError('postWithToken', code, result, params));
+            });
+    });
+}
+
+function apiRequest<T>(method: 'get' | 'post', params: ApiParams): Promise<T> {
+    return new Promise((resolve, reject) => {
+        api[method](params)
+            .done((data: T) => resolve(data))
+            .fail((code: unknown, result: unknown) => {
+                reject(new MediaWikiApiError(method, code, result, params));
+            });
+    });
+}
+
+class MediaWikiApiError extends Error {
+    readonly code: unknown;
+    readonly result: unknown;
+    readonly params: ApiParams;
+
+    constructor(method: string, code: unknown, result: unknown, params: ApiParams) {
+        super(apiErrorMessage(method, code, result));
+        this.name = 'MediaWikiApiError';
+        this.code = code;
+        this.result = result;
+        this.params = params;
+    }
+}
+
+function apiErrorMessage(method: string, code: unknown, result: unknown): string {
+    const info = apiErrorInfo(result);
+    const codeText = String(code || 'unknown');
+    return info
+        ? `MediaWiki API ${method} failed (${codeText}): ${info}`
+        : `MediaWiki API ${method} failed (${codeText})`;
+}
+
+function apiErrorInfo(result: unknown): string {
+    if (!result || typeof result !== 'object') {
+        return '';
+    }
+
+    const error = (result as { error?: { info?: unknown } }).error;
+    return typeof error?.info === 'string' ? error.info : '';
 }

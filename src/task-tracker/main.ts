@@ -46,6 +46,7 @@ async function openTaskTracker(): Promise<void> {
         const tracker = await mountTaskTracker();
         tracker.openDialog();
     } catch (error) {
+        console.error('Failed to open task tracker:', error);
         mw.notify(wgULS('站务提案追踪器载入失败：', '站務提案追蹤器載入失敗：') + errorMessage(error), { type: 'error' });
     }
 }
@@ -55,6 +56,7 @@ async function openTaskTrackerWithTask(seed: TaskSeed): Promise<void> {
         const tracker = await mountTaskTracker();
         await tracker.addOrOpenTask(seed);
     } catch (error) {
+        console.error('Failed to open task tracker with task:', error);
         mw.notify(wgULS('站务提案追踪器载入失败：', '站務提案追蹤器載入失敗：') + errorMessage(error), { type: 'error' });
     }
 }

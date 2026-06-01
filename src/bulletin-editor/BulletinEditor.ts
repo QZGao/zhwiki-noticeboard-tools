@@ -47,6 +47,7 @@ export class BulletinEditor {
             await this.loadBulletinText(editorText);
             this.render();
         } catch (error) {
+            console.error('Failed to load bulletin editor content:', error);
             const message = error instanceof Error ? error.message : String(error);
             mw.notify(wgULS('加载内容时发生错误：', '載入內容時發生錯誤：') + message, { type: 'error' });
         }
@@ -162,7 +163,8 @@ export class BulletinEditor {
             .done((data: any) => {
                 showPreviewResult(data.parse.parsedsummary, data.parse.text);
             })
-            .fail((error: string) => {
+            .fail((error: string, result: unknown) => {
+                console.error('Failed to generate bulletin preview:', { error, result });
                 mw.notify(wgULS('生成预览时发生错误：', '產生預覽時發生錯誤：') + error, { type: 'error' });
             });
     }
@@ -178,7 +180,8 @@ export class BulletinEditor {
             .done((data: ApiQueryResponse) => {
                 showDiffResult(data, wgULS('公告栏无变更', '公告欄無變更'));
             })
-            .fail((error: string) => {
+            .fail((error: string, result: unknown) => {
+                console.error('Failed to generate bulletin diff:', { error, result });
                 mw.notify(wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + error, { type: 'error' });
             });
     }
@@ -205,11 +208,13 @@ export class BulletinEditor {
                     .done((diffData: ApiQueryResponse) => {
                         showDiffResult(diffData, wgULS('存档页无变更', '存檔頁無變更'));
                     })
-                    .fail((error: string) => {
+                    .fail((error: string, result: unknown) => {
+                        console.error('Failed to generate bulletin archive diff:', { error, result });
                         mw.notify(wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + error, { type: 'error' });
                     });
             })
-            .fail((error: string) => {
+            .fail((error: string, result: unknown) => {
+                console.error('Failed to fetch bulletin archive for diff:', { error, result });
                 mw.notify(wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + error, { type: 'error' });
             });
     }
@@ -237,7 +242,8 @@ export class BulletinEditor {
 
                 this.saveArchive();
             })
-            .fail((error: string) => {
+            .fail((error: string, result: unknown) => {
+                console.error('Failed to save bulletin page:', { error, result });
                 if (error === 'editconflict') {
                     showEditConflict(this.currentBulletinText(), collectArchiveText());
                     mw.notify(wgULS(
@@ -259,7 +265,8 @@ export class BulletinEditor {
                 mw.notify(wgULS('成功保存存档页，即将重新加载页面...', '成功儲存存檔頁，即將重新載入頁面...'));
                 setTimeout(() => location.reload(), 1000);
             })
-            .fail((error: string) => {
+            .fail((error: string, result: unknown) => {
+                console.error('Failed to save bulletin archive:', { error, result });
                 mw.notify(wgULS('保存存档页时发生错误：', '儲存存檔頁時發生錯誤：') + error, { type: 'error' });
             });
     }

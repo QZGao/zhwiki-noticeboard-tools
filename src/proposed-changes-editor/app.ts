@@ -209,7 +209,7 @@ export function createProposedChangesEditorApp(): object {
                     this.previewHtml = await parseWikitext(this.options.pageTitle, this.proposedWikitext);
                     this.currentStep = 1;
                 } catch (error) {
-                    this.showError(wgULS('生成预览失败：', '產生預覽失敗：') + this.errorMessage(error));
+                    this.showError(wgULS('生成预览失败：', '產生預覽失敗：') + this.errorMessage(error), error);
                 } finally {
                     this.isLoading = false;
                 }
@@ -232,7 +232,7 @@ export function createProposedChangesEditorApp(): object {
                     this.diffHtml = await fetchWikitextDiff(this.options.pageTitle, placedWikitext, section);
                     this.currentStep = 2;
                 } catch (error) {
-                    this.showError(wgULS('生成差异失败：', '產生差異失敗：') + this.errorMessage(error));
+                    this.showError(wgULS('生成差异失败：', '產生差異失敗：') + this.errorMessage(error), error);
                 } finally {
                     this.isLoading = false;
                 }
@@ -275,10 +275,11 @@ export function createProposedChangesEditorApp(): object {
                     this.closeDialog(true);
                 } catch (error) {
                     this.isSaving = false;
-                    this.showError(wgULS('保存失败：', '儲存失敗：') + this.errorMessage(error));
+                    this.showError(wgULS('保存失败：', '儲存失敗：') + this.errorMessage(error), error);
                 }
             },
-            showError(message: string): void {
+            showError(message: string, error?: unknown): void {
+                console.error(message, error);
                 this.statusType = 'error';
                 this.statusMessage = message;
                 mw.notify(message, { type: 'error' });
