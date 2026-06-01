@@ -508,7 +508,7 @@ function compareDisplayTasks(
         return stageDifference;
     }
 
-    const dateDifference = createdAtSortValue(left.task.createdAt) - createdAtSortValue(right.task.createdAt);
+    const dateDifference = createdAtSortValue(right.task.createdAt) - createdAtSortValue(left.task.createdAt); // Newer createdAt should come first
     if (dateDifference !== 0) {
         return dateDifference;
     }

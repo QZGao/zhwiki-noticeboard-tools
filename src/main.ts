@@ -1,5 +1,10 @@
 
 import { initBulletinEditor, shouldLoadBulletinEditor } from './bulletin-editor/main';
+import {
+    configureProposedChangesEditor,
+    type CodeMirrorRequire,
+    type CodeMirrorResource,
+} from './proposed-changes-editor';
 import { separatorMessageKeys } from './rfc-editor/constants';
 import { initRfcEditor } from './rfc-editor/main';
 import { initTaskTracker } from './task-tracker/main';
@@ -21,6 +26,18 @@ const codexModules = [
     '@wikimedia/codex',
 ];
 
+const proposedChangesEditorModules = [
+    'ext.CodeMirror',
+    'ext.CodeMirror.mode.mediawiki',
+    'mediawiki.diff.styles',
+];
+
+const legacyProposedChangesEditorModules = [
+    'ext.CodeMirror.v6',
+    'ext.CodeMirror.v6.mode.mediawiki',
+    'mediawiki.diff.styles',
+];
+
 const editsectionNamespaces = new Set([
     1, // Talk
     4, // Project / Wikipedia
@@ -39,11 +56,16 @@ const loadBulletinEditorModules = createModuleLoader(bulletinEditorModules);
 const loadCodexModules = createModuleLoader(codexModules);
 
 let rfcSeparatorMessagesPromise: Promise<unknown> | null = null;
+let proposedChangesEditorResourcesPromise: Promise<CodeMirrorResource> | null = null;
 
 async function init() {
     await loadCommonModules();
     await loadCodexModules();
     await loadRfcSeparatorMessages();
+
+    configureProposedChangesEditor({
+        loadCodeMirror: loadProposedChangesEditorResources,
+    });
 
     const shouldLoadEditsectionFeatures = editsectionNamespaces.has(Number(mw.config.get('wgNamespaceNumber')));
     initTaskTracker(shouldLoadEditsectionFeatures);
@@ -85,4 +107,36 @@ function loadRfcSeparatorMessages(): Promise<unknown> {
     }
 
     return rfcSeparatorMessagesPromise;
+}
+
+function loadProposedChangesEditorResources(): Promise<CodeMirrorResource> {
+    if (!proposedChangesEditorResourcesPromise) {
+        proposedChangesEditorResourcesPromise = loadCodeMirrorResource(
+            proposedChangesEditorModules,
+            'ext.CodeMirror',
+            'ext.CodeMirror.mode.mediawiki',
+        ).catch(() => loadCodeMirrorResource(
+            legacyProposedChangesEditorModules,
+            'ext.CodeMirror.v6',
+            'ext.CodeMirror.v6.mode.mediawiki',
+        )).catch((error: unknown) => {
+            proposedChangesEditorResourcesPromise = null;
+            throw error;
+        });
+    }
+
+    return proposedChangesEditorResourcesPromise;
+}
+
+async function loadCodeMirrorResource(
+    modules: string[],
+    codeMirrorModule: string,
+    modeModule: string,
+): Promise<CodeMirrorResource> {
+    const requireFn = await Promise.resolve(mw.loader.using(modules)) as CodeMirrorRequire;
+    return {
+        require: requireFn,
+        codeMirrorModule,
+        modeModule,
+    };
 }
