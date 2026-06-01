@@ -24,7 +24,7 @@ export async function buildPlacedWikitext(
     return appendToSectionEnd(existingWikitext, proposedWikitext, placement.separator);
 }
 
-function appendToSectionEnd(existingWikitext: string, proposedWikitext: string, separator = '\n\n'): string {
+function appendToSectionEnd(existingWikitext: string, proposedWikitext: string, separator = '\n'): string {
     const proposed = proposedWikitext.trim();
     if (!proposed) {
         return existingWikitext;
@@ -37,7 +37,7 @@ function appendToSectionEnd(existingWikitext: string, proposedWikitext: string, 
     return `${existingWikitext.replace(/\s*$/, '')}${separator}${proposed}\n`;
 }
 
-function appendToSectionStart(existingWikitext: string, proposedWikitext: string, separator = '\n\n'): string {
+function appendToSectionStart(existingWikitext: string, proposedWikitext: string, separator = '\n'): string {
     const proposed = proposedWikitext.trim();
     if (!proposed) {
         return existingWikitext;

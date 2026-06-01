@@ -14,7 +14,9 @@ export function initRfcEditor(shouldLoadEditsectionLinks: boolean): void {
     }
 
     mw.hook('wikipage.content').add(($content: JQuery) => {
-        addEditsectionLinks($content);
+        setTimeout(() => {
+            addEditsectionLinks($content);
+        }, 500);
     });
 }
 

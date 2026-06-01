@@ -24,7 +24,9 @@ export function initEditsectionTrackingLinks(openWithTask: OpenWithTask): void {
     refreshEditsectionTrackingLinkLabels();
 
     mw.hook('wikipage.content').add(($content: JQuery) => {
-        addEditsectionLinks($content, openWithTask);
+        setTimeout(() => {
+            addEditsectionLinks($content, openWithTask);
+        }, 500);
     });
 }
 
