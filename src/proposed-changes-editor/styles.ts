@@ -51,7 +51,7 @@ export function injectProposedChangesEditorStyles(): void {
                 background-color: #36c;
             }
             .pcd-dialog-body {
-                min-height: min(480px, calc(100vh - 240px));
+                min-height: 0;
             }
             .pcd-target {
                 margin-bottom: 12px;
