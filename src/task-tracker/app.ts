@@ -14,6 +14,7 @@ import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './ty
 import { WikiConfigClient } from './wikiConfig';
 import { openProposedChangesEditor } from '../proposed-changes-editor';
 import { summarySuffix } from './constants';
+import { rfcMatchRegex } from '../rfc-editor/constants';
 import { isSectionOnRfc } from '../rfc-editor/api';
 import { openRfcEditorForSection } from '../rfc-editor/open';
 import { fetchBulletinLinkedPageTitles, normalizeBulletinPageTitle } from './bulletinStatus';
@@ -298,6 +299,10 @@ export function createTaskTrackerApp(): object {
                 return wgULS(`公示尚余 ${days} 日`, `公示尚餘 ${days} 日`);
             },
             isPublicNoticeOverdue(task: TrackedTask): boolean {
+                if (!task.isPublicNotice) {
+                    return false;
+                }
+
                 const days = daysUntil(task.publicNoticeEnd);
                 return days !== null && days <= 0;
             },
@@ -397,10 +402,45 @@ export function createTaskTrackerApp(): object {
                     dialogTitle: wgULS('发送公示留言', '發送公示留言'),
                     editSummary: wgULS('发送公示留言', '發送公示留言') + summarySuffix,
                     onSaved: (data) => {
+                        const noticeDays = makePublicDays(data.proposedWikitext);
+                        const endTimestamp = addUtcDays(new Date(), noticeDays);
                         const startDate = today();
                         task.publicNoticeStart = startDate;
-                        task.publicNoticeEnd = addDays(startDate, makePublicDays(data.proposedWikitext));
+                        task.publicNoticeEnd = utcDateString(endTimestamp);
+                        task.isPublicNotice = true;
+
+                        if (!task.hasRfc || !rfcMatchRegex.test(data.placedWikitext) || !confirm(wgULS(
+                            '已发送公示留言。是否加入 {{Make public/rfc}}？',
+                            '已發送公示留言。是否加入 {{Make public/rfc}}？',
+                        ))) {
+                            return;
+                        }
+
+                        setTimeout(() => {
+                            this.openMakePublicRfcEditor(
+                                target,
+                                noticeDays,
+                                formatChineseUtcTimestamp(endTimestamp),
+                            );
+                        }, 0);
                     },
+                });
+            },
+            openMakePublicRfcEditor(
+                target: { pageTitle: string; section: string },
+                days: number,
+                endTimestamp: string,
+            ): void {
+                openProposedChangesEditor({
+                    pageTitle: target.pageTitle,
+                    placement: {
+                        type: 'manual',
+                        section: target.section,
+                        buildSectionText: insertAfterRfcTemplate,
+                    },
+                    initialWikitext: `{{Make public/rfc|days=${days}|end=${endTimestamp}}}`,
+                    dialogTitle: wgULS('加入公示RfC模板', '加入公示RfC模板'),
+                    editSummary: wgULS('加入公示RfC模板', '加入公示RfC模板') + summarySuffix,
                 });
             },
             refreshCurrentPageRfcStatuses(): void {
@@ -585,14 +625,47 @@ function makePublicDays(wikitext: string): number {
     return Number.isFinite(days) && days > 0 ? days : 7;
 }
 
-function addDays(dateString: string, days: number): string {
-    const [year, month, day] = dateString.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day + days));
+function addUtcDays(date: Date, days: number): Date {
+    return new Date(date.getTime() + days * 86400000);
+}
+
+function utcDateString(date: Date): string {
     return [
         date.getUTCFullYear(),
         String(date.getUTCMonth() + 1).padStart(2, '0'),
         String(date.getUTCDate()).padStart(2, '0'),
     ].join('-');
+}
+
+function formatChineseUtcTimestamp(date: Date): string {
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    return [
+        `${date.getUTCFullYear()}年`,
+        `${date.getUTCMonth() + 1}月`,
+        `${date.getUTCDate()}日 `,
+        `(${weekdays[date.getUTCDay()]}) `,
+        `${String(date.getUTCHours()).padStart(2, '0')}:`,
+        `${String(date.getUTCMinutes()).padStart(2, '0')} (UTC)`,
+    ].join('');
+}
+
+function insertAfterRfcTemplate(existingSectionWikitext: string, proposedChangesWikitext: string): string {
+    const match = rfcMatchRegex.exec(existingSectionWikitext);
+    const proposed = proposedChangesWikitext.trim();
+    if (!proposed) {
+        return existingSectionWikitext;
+    }
+
+    if (!match) {
+        throw new Error(wgULS('找不到 {{rfc}} 模板', '找不到 {{rfc}} 模板'));
+    }
+
+    const insertIndex = match.index + match[0].length;
+    const before = existingSectionWikitext.slice(0, insertIndex).replace(/\s*$/, '');
+    const after = existingSectionWikitext.slice(insertIndex).replace(/^\s*/, '');
+    return after
+        ? `${before}\n${proposed}\n${after}`
+        : `${before}\n${proposed}\n`;
 }
 
 function encodeWikiTitle(pageTitle: string): string {
