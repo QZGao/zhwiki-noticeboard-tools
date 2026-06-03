@@ -93,6 +93,9 @@ export function injectTaskTrackerStyles(): void {
                 color: #54595d;
                 font-size: 0.875em;
             }
+            .ntt-task-warnings {
+                font-size: larger;
+            }
             .ntt-task-flags span {
                 border: 1px solid #a2a9b1;
                 border-radius: 2px;
@@ -166,7 +169,6 @@ export function injectTaskTrackerStyles(): void {
             }
             .ntt-rfc-edit-link {
                 margin-left: 4px;
-                text-decoration: underline;
             }
             .ntt-empty {
                 border: 1px dashed #a2a9b1;

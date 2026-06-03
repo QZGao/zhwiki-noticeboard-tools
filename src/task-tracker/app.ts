@@ -345,7 +345,7 @@ export function createTaskTrackerApp(): object {
                     : wgULS('（检测到未挂RfC）', '（檢測到未掛RfC）');
             },
             speedyDeleteDataWarning(task: TrackedTask): TaskWarning | null {
-                if (!hasPublicNoticeEnded(task) || !isSpeedyDeleteTalkTask(task)) {
+                if (task.stage === 'closed' || !hasPublicNoticeEnded(task) || !isSpeedyDeleteTalkTask(task)) {
                     return null;
                 }
 
