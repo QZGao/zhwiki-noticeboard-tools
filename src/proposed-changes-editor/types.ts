@@ -1,4 +1,6 @@
-export type SectionId = string | number;
+import type { SectionId } from '../mediawiki';
+
+export type { SectionId } from '../mediawiki';
 
 export type ProposedChangesPlacement =
     | {

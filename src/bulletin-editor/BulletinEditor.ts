@@ -1,5 +1,5 @@
 import { bulletinTitle, summarySuffix } from './constants';
-import type { ApiQueryResponse, EditableRange } from './types';
+import type { EditableRange } from './types';
 import { valueAsString } from './utils';
 import {
     collectActiveText,
@@ -20,7 +20,8 @@ import {
 import {
     errorMessage,
     fetchCompareWikitextDiff,
-    type ApiParams,
+    fetchPageWikitextRevision,
+    parseWikitextPreview,
 } from '../mediawiki';
 
 export class BulletinEditor {
@@ -72,21 +73,13 @@ export class BulletinEditor {
     }
 
     private async loadBulletinText(editorText: string): Promise<void> {
-        const params: ApiParams = {
-            action: 'query',
-            format: 'json',
-            prop: 'revisions',
-            titles: bulletinTitle,
-            rvprop: ['content', 'timestamp'],
-            formatversion: '2',
-            curtimestamp: true,
-        };
+        let startRevisionId: number | undefined;
 
         if (
             mw.config.get('wgRevisionId') !== 0
             && mw.config.get('wgRevisionId') !== mw.config.get('wgCurRevisionId')
         ) {
-            params.rvstartid = mw.config.get('wgRevisionId');
+            startRevisionId = mw.config.get('wgRevisionId');
             this.$wrapper.append(
                 $('<div>')
                     .addClass('mw-message-box-warning mw-message-box')
@@ -98,14 +91,12 @@ export class BulletinEditor {
             );
         }
 
-        const data = await this.api.get(params) as ApiQueryResponse;
-        const revision = data.query.pages[0].revisions?.[0];
-        if (!revision) {
-            throw new Error('missing bulletin revision');
-        }
-
-        this.basetimestamp = revision.timestamp || '';
-        this.curtimestamp = data.curtimestamp || '';
+        const revision = await fetchPageWikitextRevision(this.api, bulletinTitle, {
+            includeCurrentTimestamp: true,
+            startRevisionId,
+        });
+        this.basetimestamp = revision.basetimestamp;
+        this.curtimestamp = revision.curtimestamp;
         this.bulletinText = revision.content;
 
         if (editorText) {
@@ -154,21 +145,18 @@ export class BulletinEditor {
     }
 
     private previewPage(): void {
-        void this.api.post({
-            action: 'parse',
-            contentmodel: 'wikitext',
-            text: this.currentBulletinText(),
-            title: bulletinTitle,
+        void parseWikitextPreview(this.api, bulletinTitle, this.currentBulletinText(), {
             summary: valueAsString($('#be-summary').val()) + summarySuffix,
-            prop: 'text',
-            formatversion: '2',
         })
-            .done((data: any) => {
-                showPreviewResult(data.parse.parsedsummary, data.parse.text);
+            .then((parsed) => {
+                showPreviewResult(parsed.parsedSummary, parsed.text);
             })
-            .fail((error: string, result: unknown) => {
-                console.error('Failed to generate bulletin preview:', { error, result });
-                mw.notify(wgULS('生成预览时发生错误：', '產生預覽時發生錯誤：') + error, { type: 'error' });
+            .catch((error: unknown) => {
+                console.error('Failed to generate bulletin preview:', error);
+                mw.notify(
+                    wgULS('生成预览时发生错误：', '產生預覽時發生錯誤：') + errorMessage(error),
+                    { type: 'error' },
+                );
             });
     }
 
@@ -187,17 +175,11 @@ export class BulletinEditor {
     }
 
     private diffArchive(): void {
-        void this.api.get({
-            action: 'query',
-            prop: 'revisions',
-            rvprop: ['content'],
-            titles: this.archiveTitle,
-            formatversion: '2',
+        void fetchPageWikitextRevision(this.api, this.archiveTitle, {
+            allowMissing: true,
         })
-            .done((data: ApiQueryResponse) => {
-                const page = data.query.pages[0];
-                const text = page.missing ? '' : page.revisions?.[0]?.content || '';
-
+            .then((revision) => {
+                const text = revision.content;
                 void fetchCompareWikitextDiff(this.api, this.archiveTitle, this.currentArchiveText(text), {
                     fromWikitext: text,
                 })
@@ -212,9 +194,12 @@ export class BulletinEditor {
                         );
                     });
             })
-            .fail((error: string, result: unknown) => {
-                console.error('Failed to fetch bulletin archive for diff:', { error, result });
-                mw.notify(wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + error, { type: 'error' });
+            .catch((error: unknown) => {
+                console.error('Failed to fetch bulletin archive for diff:', error);
+                mw.notify(
+                    wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + errorMessage(error),
+                    { type: 'error' },
+                );
             });
     }
 

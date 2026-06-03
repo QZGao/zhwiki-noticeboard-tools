@@ -1,5 +1,7 @@
 export type ApiParams = Record<string, string | number | boolean | string[] | number[] | File | undefined>;
 
+export type SectionId = string | number;
+
 export type ApiRevision = {
     content?: string;
     timestamp?: string;
@@ -12,10 +14,33 @@ export type ApiRevision = {
     };
 };
 
-type ApiCompareResponse = {
-    compare?: {
-        body?: string;
+export type ApiQueryPage = {
+    missing?: boolean;
+    revisions?: ApiRevision[];
+};
+
+export type ApiQueryResponse = {
+    curtimestamp?: string;
+    query: {
+        pages: ApiQueryPage[];
     };
+};
+
+export type CurrentWikitextRevision = {
+    content: string;
+    resolvedSection: string | null;
+    basetimestamp: string;
+    curtimestamp: string;
+};
+
+export type ParsedWikitext = {
+    text: string;
+    parsedSummary: string;
+};
+
+export type ParseWikitextOptions = {
+    preSaveTransform?: boolean;
+    summary?: string;
 };
 
 export type CompareWikitextDiffOptions = {
@@ -23,6 +48,39 @@ export type CompareWikitextDiffOptions = {
     preSaveTransform?: boolean;
     section?: string | null;
 };
+
+export type FetchWikitextRevisionOptions = {
+    allowMissing?: boolean;
+    includeCurrentTimestamp?: boolean;
+    section?: SectionId | null;
+    startRevisionId?: number;
+};
+
+type ApiCompareResponse = {
+    compare?: {
+        body?: string;
+    };
+};
+
+type ParseResponse = {
+    parse: {
+        parsedsummary?: string;
+        text: string;
+    };
+};
+
+type SectionsResponse = {
+    parse: {
+        sections: Array<{
+            anchor?: string;
+            index: string;
+            line?: string;
+        }>;
+    };
+};
+
+const defaultApi = createLazyApi();
+const sectionIndexCache = new Map<string, Promise<string>>();
 
 export function createLazyApi(): () => any {
     let api: any = null;
@@ -42,6 +100,126 @@ export function revisionContent(revision: ApiRevision): string {
 
 export function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+export async function parseWikitext(pageTitle: string, wikitext: string): Promise<string> {
+    return (await parseWikitextPreview(defaultApi(), pageTitle, wikitext, {
+        preSaveTransform: true,
+    })).text;
+}
+
+export async function parseWikitextPreview(
+    api: any,
+    pageTitle: string,
+    wikitext: string,
+    options: ParseWikitextOptions = {},
+): Promise<ParsedWikitext> {
+    const params: ApiParams = {
+        action: 'parse',
+        contentmodel: 'wikitext',
+        text: wikitext,
+        title: pageTitle,
+        prop: 'text',
+        formatversion: '2',
+    };
+
+    if (options.preSaveTransform) {
+        params.pst = true;
+    }
+
+    if (options.summary !== undefined) {
+        params.summary = options.summary;
+    }
+
+    const data = await apiRequest<ParseResponse>(api, 'post', params);
+    return {
+        text: data.parse.text,
+        parsedSummary: data.parse.parsedsummary || '',
+    };
+}
+
+export async function fetchCurrentWikitext(pageTitle: string, section: SectionId | null): Promise<string> {
+    return (await fetchCurrentWikitextRevision(pageTitle, section)).content;
+}
+
+export async function fetchCurrentWikitextRevision(
+    pageTitle: string,
+    section: SectionId | null,
+): Promise<CurrentWikitextRevision> {
+    return fetchPageWikitextRevision(defaultApi(), pageTitle, {
+        includeCurrentTimestamp: true,
+        section,
+    });
+}
+
+export async function fetchPageWikitextRevision(
+    api: any,
+    pageTitle: string,
+    options: FetchWikitextRevisionOptions = {},
+): Promise<CurrentWikitextRevision> {
+    const resolvedSection = await resolveSectionIndex(api, pageTitle, options.section ?? null);
+    const params: ApiParams = {
+        action: 'query',
+        prop: 'revisions',
+        rvprop: ['content', 'timestamp'],
+        rvslots: 'main',
+        titles: pageTitle,
+        formatversion: '2',
+    };
+
+    if (options.includeCurrentTimestamp) {
+        params.curtimestamp = true;
+    }
+
+    if (options.startRevisionId !== undefined) {
+        params.rvstartid = options.startRevisionId;
+    }
+
+    if (resolvedSection !== null) {
+        params.rvsection = resolvedSection;
+    }
+
+    const data = await apiRequest<ApiQueryResponse>(api, 'get', params);
+    const page = data.query.pages[0];
+    if (!page || page.missing) {
+        if (options.allowMissing) {
+            return {
+                content: '',
+                resolvedSection,
+                basetimestamp: '',
+                curtimestamp: data.curtimestamp || '',
+            };
+        }
+
+        throw new Error(wgULS('页面不存在', '頁面不存在'));
+    }
+
+    const revision = page.revisions?.[0];
+    if (!revision) {
+        throw new Error('missing page revision');
+    }
+
+    return {
+        content: revisionContent(revision),
+        resolvedSection,
+        basetimestamp: revision.timestamp || '',
+        curtimestamp: data.curtimestamp || '',
+    };
+}
+
+export async function fetchWikitextDiff(
+    pageTitle: string,
+    newWikitext: string,
+    section: SectionId | null,
+    options: { newSection?: boolean } = {},
+): Promise<string> {
+    const resolvedSection = options.newSection
+        ? 'new'
+        : await resolveSectionIndex(defaultApi(), pageTitle, section);
+    return fetchCompareWikitextDiff(defaultApi(), pageTitle, newWikitext, {
+        preSaveTransform: true,
+        section: resolvedSection,
+    });
 }
 
 export async function fetchCompareWikitextDiff(
@@ -77,6 +255,59 @@ export async function fetchCompareWikitextDiff(
     return data.compare?.body || '';
 }
 
+export async function fetchLatestRevisionId(pageTitle: string): Promise<number> {
+    const data = await apiRequest<ApiQueryResponse>(defaultApi(), 'get', {
+        action: 'query',
+        prop: 'revisions',
+        rvprop: 'ids',
+        titles: pageTitle,
+        formatversion: '2',
+    });
+    const page = data.query.pages[0];
+    if (!page || page.missing) {
+        throw new Error(wgULS('页面不存在', '頁面不存在'));
+    }
+
+    const revid = page.revisions?.[0]?.revid;
+    if (typeof revid !== 'number') {
+        throw new Error('missing page revision id');
+    }
+
+    return revid;
+}
+
+export async function saveWikitextRevision(
+    pageTitle: string,
+    section: string | null,
+    wikitext: string,
+    summary: string,
+    basetimestamp: string,
+    curtimestamp: string,
+): Promise<void> {
+    const params: ApiParams = {
+        action: 'edit',
+        title: pageTitle,
+        text: wikitext,
+        summary,
+        watchlist: 'nochange',
+        formatversion: '2',
+    };
+
+    if (basetimestamp) {
+        params.basetimestamp = basetimestamp;
+    }
+
+    if (curtimestamp) {
+        params.starttimestamp = curtimestamp;
+    }
+
+    if (section !== null) {
+        params.section = section;
+    }
+
+    await apiPostWithToken(defaultApi(), params);
+}
+
 export function apiRequest<T>(api: any, method: 'get' | 'post', params: ApiParams): Promise<T> {
     return new Promise((resolve, reject) => {
         api[method](params)
@@ -109,6 +340,61 @@ export class MediaWikiApiError extends Error {
         this.result = result;
         this.params = params;
     }
+}
+
+async function resolveSectionIndex(api: any, pageTitle: string, section: SectionId | null): Promise<string | null> {
+    if (section === null) {
+        return null;
+    }
+
+    const sectionValue = String(section);
+    if (/^\d+$/.test(sectionValue)) {
+        return sectionValue;
+    }
+
+    const cacheKey = `${pageTitle}#${sectionValue}`;
+    let promise = sectionIndexCache.get(cacheKey);
+    if (!promise) {
+        promise = fetchSectionIndexByAnchor(api, pageTitle, sectionValue).catch((error: unknown) => {
+            sectionIndexCache.delete(cacheKey);
+            throw error;
+        });
+        sectionIndexCache.set(cacheKey, promise);
+    }
+
+    return promise;
+}
+
+async function fetchSectionIndexByAnchor(api: any, pageTitle: string, anchor: string): Promise<string> {
+    const data = await apiRequest<SectionsResponse>(api, 'get', {
+        action: 'parse',
+        page: pageTitle,
+        prop: 'sections',
+        formatversion: '2',
+    });
+
+    const normalizedAnchor = normalizeSectionAnchor(anchor);
+    const section = data.parse.sections.find((candidate) => {
+        return normalizeSectionAnchor(candidate.anchor || candidate.line || '') === normalizedAnchor;
+    });
+
+    if (!section) {
+        throw new Error(wgULS('找不到目标章节', '找不到目標章節'));
+    }
+
+    return section.index;
+}
+
+function normalizeSectionAnchor(anchor: string): string {
+    const stripped = anchor.replace(/^#/, '');
+    let decoded = stripped;
+    try {
+        decoded = decodeURIComponent(stripped);
+    } catch {
+        decoded = stripped;
+    }
+
+    return decoded.replace(/ /g, '_');
 }
 
 function apiErrorMessage(method: string, code: unknown, result: unknown): string {

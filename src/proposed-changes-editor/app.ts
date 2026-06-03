@@ -4,7 +4,7 @@ import {
     fetchWikitextDiff,
     parseWikitext,
     saveWikitextRevision,
-} from './api';
+} from '../mediawiki';
 import {
     destroyCodeMirror,
     initializeCodeMirror,

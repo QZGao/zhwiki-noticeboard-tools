@@ -1,18 +1,3 @@
-export type ApiQueryPage = {
-    missing?: boolean;
-    revisions?: Array<{
-        content: string;
-        timestamp?: string;
-    }>;
-};
-
-export type ApiQueryResponse = {
-    curtimestamp?: string;
-    query: {
-        pages: ApiQueryPage[];
-    };
-};
-
 export type ParsedTemplate = {
     parameters: Record<string | number, string>;
 };

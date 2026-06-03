@@ -13,7 +13,7 @@ import { TASK_TRACKER_TEMPLATE } from './template';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 import { WikiConfigClient } from './wikiConfig';
 import { openProposedChangesEditor } from '../proposed-changes-editor';
-import { fetchCurrentWikitext, fetchLatestRevisionId } from '../proposed-changes-editor/api';
+import { fetchCurrentWikitext, fetchLatestRevisionId } from '../mediawiki';
 import { summarySuffix } from './constants';
 import { rfcMatchRegex } from '../rfc-editor/constants';
 import { isSectionOnRfc } from '../rfc-editor/api';
