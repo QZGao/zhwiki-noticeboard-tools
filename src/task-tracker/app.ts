@@ -318,8 +318,7 @@ export function createTaskTrackerApp(): object {
                     && targetFromTaskPageTitle(task.pageTitle) !== null;
             },
             canDehydrateComparisonTemplate(task: TrackedTask): boolean {
-                return hasPublicNoticeEnded(task)
-                    && this.comparisonTemplateStatusByPageTitle[task.pageTitle] === true;
+                return this.comparisonTemplateStatusByPageTitle[task.pageTitle] === true;
             },
             stageLabel(stage: TaskStage): string {
                 return this.stageOptions.find((option: { value: TaskStage }) => option.value === stage)?.label || '提案';
@@ -571,7 +570,7 @@ export function createTaskTrackerApp(): object {
 
                 for (const task of this.tasks) {
                     const target = targetFromTaskPageTitle(task.pageTitle);
-                    if (!hasPublicNoticeEnded(task) || !target) {
+                    if (!target) {
                         continue;
                     }
 
