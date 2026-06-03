@@ -1,6 +1,6 @@
 import { TASK_TRACKER_VERSION } from './constants';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
-import { nowIsoString, utcDateString } from '../datetime';
+import { daysUntilUtcDate, nowIsoString, utcDateString } from '../datetime';
 
 const stageValues = new Set<TaskStage>(['proposal', 'publicNotice', 'closed']);
 
@@ -57,6 +57,11 @@ export function cloneTasks(tasks: TrackedTask[]): TrackedTask[] {
 
 export function compareTimestamps(left?: string, right?: string): number {
     return timestampValue(left) - timestampValue(right);
+}
+
+export function hasPublicNoticeEnded(task: TrackedTask): boolean {
+    const days = daysUntilUtcDate(task.publicNoticeEnd);
+    return days !== null && days <= 0;
 }
 
 function normalizeTask(task: Partial<TrackedTask>): TrackedTask {

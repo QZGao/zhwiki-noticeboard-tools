@@ -2,6 +2,7 @@ import {
     compareTimestamps,
     createSnapshot,
     createTask,
+    hasPublicNoticeEnded,
     normalizeSnapshot,
 } from './model';
 import { loadLocalSnapshot, saveLocalSnapshot } from './storage';
@@ -9,31 +10,42 @@ import { injectTaskTrackerStyles } from './styles';
 import { TASK_TRACKER_TEMPLATE } from './template';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 import { WikiConfigClient } from './wikiConfig';
-import { openProposedChangesEditor } from '../proposed-changes-editor';
-import { errorMessage, fetchCurrentWikitext, fetchLatestRevisionId } from '../mediawiki';
+import { errorMessage, fetchCurrentWikitext } from '../mediawiki';
 import {
-    addUtcDays,
     daysSinceUtcDate,
     daysUntilUtcDate,
-    formatChineseUtcTimestamp,
-    utcDateString,
     utcDateValue,
 } from '../datetime';
 import {
-    normalizeComparablePageTitle,
-    wikiPageUrl,
-} from '../wikiTitle';
-import { summarySuffix } from './constants';
-import { rfcMatchRegex } from '../rfc-editor/constants';
+    isSpeedyDeleteTalkTask,
+    targetFromTaskPageTitle,
+    type TaskTarget,
+} from './taskTargets';
+import { wikiPageUrl } from '../wikiTitle';
+import {
+    bulletinMismatchLabel as bulletinMismatchLabelForTask,
+    rfcMismatchLabel as rfcMismatchLabelForTask,
+    speedyDeleteDataWarning as speedyDeleteDataWarningForTask,
+    taskWarnings as taskWarningsForTask,
+    type TaskWarning,
+} from './warnings';
+import {
+    openMakePublicRfcEditor as openMakePublicRfcEditorAction,
+    openPublicNoticeMessageEditor as openPublicNoticeMessageEditorAction,
+    openPublicNoticePassedMessageEditor as openPublicNoticePassedMessageEditorAction,
+    openPublicNoticeTemplateRemovalEditor as openPublicNoticeTemplateRemovalEditorAction,
+} from './publicNoticeActions';
+import {
+    openDeleteDataEditRequestEditor as openDeleteDataEditRequestEditorAction,
+    openDeleteDataSandboxEditor as openDeleteDataSandboxEditorAction,
+} from './deleteDataActions';
 import { isSectionOnRfc } from '../rfc-editor/api';
 import { openRfcEditorForSection } from '../rfc-editor/open';
 import { fetchBulletinLinkedPageTitles, normalizeBulletinPageTitle } from './bulletinStatus';
 import { refreshEditsectionTrackingLinkLabels } from './editsectionLinks';
 import { currentPageTitle, findCurrentPageSection } from './pageSections';
 import {
-    commentPublicNoticeTemplates,
     containsComparisonTemplateContent,
-    containsRemovablePublicNoticeTemplates,
     extractComparisonTemplateContent,
 } from './publicNoticeWikitext';
 import { vueCompatOptions } from '../codex';
@@ -43,20 +55,6 @@ const stageSortOrder: Record<TaskStage, number> = {
     proposal: 0,
     publicNotice: 1,
     closed: 2,
-};
-
-const speedyDeleteTalkPageTitles = new Set([
-    'wikipedia talk:快速删除',
-    'wikipedia talk:快速刪除',
-]);
-const deleteDataTitle = 'Module:Delete/data';
-const deleteDataSandboxTitle = 'Module:Delete/data/sandbox';
-const deleteDataTalkTitle = 'Module talk:Delete/data';
-
-type TaskWarning = {
-    key: string;
-    text: string;
-    link?: string;
 };
 
 export function createTaskTrackerApp(): object {
@@ -352,47 +350,22 @@ export function createTaskTrackerApp(): object {
                 return this.stageOptions.find((option: { value: TaskStage }) => option.value === stage)?.label || '提案';
             },
             rfcMismatchLabel(task: TrackedTask): string {
-                const detected = this.rfcStatusByPageTitle[task.pageTitle];
-                if (typeof detected !== 'boolean' || detected === task.hasRfc) {
-                    return '';
-                }
-
-                return detected
-                    ? wgULS('（检测到已挂RfC）', '（檢測到已掛RfC）')
-                    : wgULS('（检测到未挂RfC）', '（檢測到未掛RfC）');
+                return rfcMismatchLabelForTask(task, this.rfcStatusByPageTitle[task.pageTitle]);
             },
             speedyDeleteDataWarning(task: TrackedTask): TaskWarning | null {
-                if (task.stage === 'closed' || !hasPublicNoticeEnded(task) || !isSpeedyDeleteTalkTask(task)) {
-                    return null;
-                }
-
-                return {
-                    key: 'speedy-delete-data',
-                    text: wgULS('公示结束后请修改', '公示結束後請修改'),
-                    link: wikiPageUrl('Module:Delete/data'),
-                };
+                return speedyDeleteDataWarningForTask(task);
             },
             taskWarnings(task: TrackedTask): TaskWarning[] {
-                const warnings: Array<TaskWarning | null> = [
-                    warningFromLabel('rfc-mismatch', this.rfcMismatchLabel(task)),
-                    warningFromLabel('bulletin-mismatch', this.bulletinMismatchLabel(task)),
-                    this.speedyDeleteDataWarning(task),
-                ].filter(Boolean);
-
-                return warnings as TaskWarning[];
+                return taskWarningsForTask(task, {
+                    bulletinDetected: this.bulletinStatusByPageTitle[task.pageTitle],
+                    rfcDetected: this.rfcStatusByPageTitle[task.pageTitle],
+                });
             },
             canOpenRfcEditor(task: TrackedTask): boolean {
                 return findCurrentPageSection(task.pageTitle) !== null;
             },
             bulletinMismatchLabel(task: TrackedTask): string {
-                const detected = this.bulletinStatusByPageTitle[task.pageTitle];
-                if (typeof detected !== 'boolean' || detected === task.hasBulletin) {
-                    return '';
-                }
-
-                return detected
-                    ? wgULS('（检测到已挂公告栏）', '（檢測到已掛公告欄）')
-                    : wgULS('（检测到未挂公告栏）', '（檢測到未掛公告欄）');
+                return bulletinMismatchLabelForTask(task, this.bulletinStatusByPageTitle[task.pageTitle]);
             },
             async refreshBulletinStatusesForDialogOpen(): Promise<void> {
                 if (this.bulletinStatusRefreshPromise) {
@@ -452,39 +425,11 @@ export function createTaskTrackerApp(): object {
                     return;
                 }
 
-                openProposedChangesEditor({
-                    pageTitle: target.pageTitle,
-                    placement: {
-                        type: 'append-section-end',
-                        section: target.section,
-                    },
-                    initialWikitext: `: {{subst:Make public|7|content=${task.title}|end=yes}}。--~~~~`,
-                    dialogTitle: wgULS('发送公示留言', '發送公示留言'),
-                    editSummary: wgULS('发送公示留言', '發送公示留言') + summarySuffix,
-                    onSaved: (data) => {
-                        const noticeDays = makePublicDays(data.proposedWikitext);
-                        const endTimestamp = addUtcDays(new Date(), noticeDays);
-                        const startDate = utcDateString();
-                        task.publicNoticeStart = startDate;
-                        task.publicNoticeEnd = utcDateString(endTimestamp);
-                        task.isPublicNotice = true;
-
-                        if (!task.hasRfc || !rfcMatchRegex.test(data.placedWikitext) || !confirm(wgULS(
-                            '已发送公示留言。是否加入 {{Make public/rfc}}？',
-                            '已發送公示留言。是否加入 {{Make public/rfc}}？',
-                        ))) {
-                            return;
-                        }
-
-                        setTimeout(() => {
-                            this.openMakePublicRfcEditor(
-                                target,
-                                noticeDays,
-                                formatChineseUtcTimestamp(endTimestamp),
-                            );
-                        }, 0);
-                    },
-                });
+                openPublicNoticeMessageEditorAction(
+                    task,
+                    target,
+                    (nextTarget, days, endTimestamp) => this.openMakePublicRfcEditor(nextTarget, days, endTimestamp),
+                );
             },
             openPublicNoticePassedMessageEditor(task: TrackedTask): void {
                 const target = this.taskTargetOrNotify(task);
@@ -492,71 +437,24 @@ export function createTaskTrackerApp(): object {
                     return;
                 }
 
-                openProposedChangesEditor({
-                    pageTitle: target.pageTitle,
-                    placement: {
-                        type: 'append-section-end',
-                        section: target.section,
-                    },
-                    initialWikitext: ':: 公示通過。--~~~~',
-                    dialogTitle: wgULS('发送公示通过留言', '發送公示通過留言'),
-                    editSummary: wgULS('发送公示通过留言', '發送公示通過留言') + summarySuffix,
-                    onSaved: (data) => {
-                        task.isPublicNotice = false;
-
-                        if (
-                            !task.hasRfc
-                            || !containsRemovablePublicNoticeTemplates(data.placedWikitext)
-                            || !confirm(wgULS(
-                                '已发送公示通过留言。是否注释移除 {{rfc}} / {{Make public/rfc}}？',
-                                '已發送公示通過留言。是否註解移除 {{rfc}} / {{Make public/rfc}}？',
-                            ))
-                        ) {
-                            return;
-                        }
-
-                        const commentedWikitext = commentPublicNoticeTemplates(data.placedWikitext);
-                        if (commentedWikitext === data.placedWikitext) {
-                            return;
-                        }
-
-                        setTimeout(() => {
-                            this.openPublicNoticeTemplateRemovalEditor(target, commentedWikitext);
-                        }, 0);
-                    },
-                });
+                openPublicNoticePassedMessageEditorAction(
+                    task,
+                    target,
+                    (nextTarget, wikitext) => this.openPublicNoticeTemplateRemovalEditor(nextTarget, wikitext),
+                );
             },
             openPublicNoticeTemplateRemovalEditor(
-                target: { pageTitle: string; section: string },
+                target: TaskTarget,
                 wikitext: string,
             ): void {
-                openProposedChangesEditor({
-                    pageTitle: target.pageTitle,
-                    placement: {
-                        type: 'full-replace',
-                        section: target.section,
-                    },
-                    initialWikitext: wikitext,
-                    dialogTitle: wgULS('注释公示相关模板', '註解公示相關模板'),
-                    editSummary: wgULS('注释公示相关模板', '註解公示相關模板') + summarySuffix,
-                });
+                openPublicNoticeTemplateRemovalEditorAction(target, wikitext);
             },
             openMakePublicRfcEditor(
-                target: { pageTitle: string; section: string },
+                target: TaskTarget,
                 days: number,
                 endTimestamp: string,
             ): void {
-                openProposedChangesEditor({
-                    pageTitle: target.pageTitle,
-                    placement: {
-                        type: 'manual',
-                        section: target.section,
-                        buildSectionText: insertAfterRfcTemplate,
-                    },
-                    initialWikitext: `{{Make public/rfc|days=${days}|end=${endTimestamp}}}`,
-                    dialogTitle: wgULS('加入公示RfC模板', '加入公示RfC模板'),
-                    editSummary: wgULS('加入公示RfC模板', '加入公示RfC模板') + summarySuffix,
-                });
+                openMakePublicRfcEditorAction(target, days, endTimestamp);
             },
             async dehydrateComparisonTemplate(task: TrackedTask): Promise<void> {
                 const target = this.taskTargetOrNotify(task);
@@ -583,34 +481,9 @@ export function createTaskTrackerApp(): object {
                 }
             },
             async openDeleteDataSandboxEditor(): Promise<void> {
-                const targetName = `noticeboard-tools-delete-data-sandbox-${Date.now()}`;
-                const opened = window.open('about:blank', targetName);
-                if (opened) {
-                    opened.opener = null;
-                    opened.document.title = wgULS('正在载入编辑器', '正在載入編輯器');
-                    opened.document.body.textContent = wgULS('正在载入 Module:Delete/data 内容……', '正在載入 Module:Delete/data 內容……');
-                }
-
-                try {
-                    const content = await fetchCurrentWikitext(deleteDataTitle, null);
-                    openEditFormWithText(
-                        deleteDataSandboxTitle,
-                        content,
-                        wgULS('同步 Module:Delete/data', '同步 Module:Delete/data'),
-                        targetName,
-                    );
-                } catch (error) {
-                    console.error('Failed to open Module:Delete/data/sandbox editor:', error);
-                    this.statusMessage = wgULS(
-                        '载入 Module:Delete/data 失败：',
-                        '載入 Module:Delete/data 失敗：',
-                    ) + errorMessage(error);
-                    mw.notify(this.statusMessage, { type: 'error' });
-
-                    if (opened) {
-                        opened.close();
-                    }
-                }
+                await openDeleteDataSandboxEditorAction((message) => {
+                    this.statusMessage = message;
+                });
             },
             async openDeleteDataEditRequestEditor(task: TrackedTask): Promise<void> {
                 const target = this.taskTargetOrNotify(task);
@@ -618,34 +491,9 @@ export function createTaskTrackerApp(): object {
                     return;
                 }
 
-                try {
-                    const date = utcDateString(new Date());
-                    const sectionTitle = `編輯請求 ${date}`;
-                    const sandboxRevid = await fetchLatestRevisionId(deleteDataSandboxTitle);
-                    openProposedChangesEditor({
-                        pageTitle: deleteDataTalkTitle,
-                        placement: {
-                            type: 'new-section',
-                        },
-                        initialWikitext: buildDeleteDataEditRequestWikitext(
-                            sectionTitle,
-                            `${target.pageTitle}#${target.section}`,
-                            sandboxRevid,
-                        ),
-                        dialogTitle: wgULS(
-                            '发送编辑请求到Module talk:Delete/data',
-                            '發送編輯請求到Module talk:Delete/data',
-                        ),
-                        editSummary: sectionTitle + summarySuffix,
-                    });
-                } catch (error) {
-                    console.error('Failed to open Module:Delete/data edit request editor:', error);
-                    this.statusMessage = wgULS(
-                        '载入 Module:Delete/data/sandbox 版本失败：',
-                        '載入 Module:Delete/data/sandbox 版本失敗：',
-                    ) + errorMessage(error);
-                    mw.notify(this.statusMessage, { type: 'error' });
-                }
+                await openDeleteDataEditRequestEditorAction(target, (message) => {
+                    this.statusMessage = message;
+                });
             },
             refreshCurrentPageRfcStatuses(): void {
                 for (const task of this.tasks) {
@@ -696,7 +544,7 @@ export function createTaskTrackerApp(): object {
             },
             async fetchComparisonTemplateStatus(
                 pageTitle: string,
-                target: { pageTitle: string; section: string },
+                target: TaskTarget,
             ): Promise<void> {
                 if (this.comparisonTemplateStatusPromisesByPageTitle[pageTitle]) {
                     return this.comparisonTemplateStatusPromisesByPageTitle[pageTitle];
@@ -717,7 +565,7 @@ export function createTaskTrackerApp(): object {
                 this.comparisonTemplateStatusPromisesByPageTitle[pageTitle] = promise;
                 return promise;
             },
-            taskTargetOrNotify(task: TrackedTask): { pageTitle: string; section: string } | null {
+            taskTargetOrNotify(task: TrackedTask): TaskTarget | null {
                 const target = targetFromTaskPageTitle(task.pageTitle);
                 if (target) {
                     return target;
@@ -840,86 +688,6 @@ function createdAtSortValue(dateString: string): number {
     return utcDateValue(dateString) ?? Number.NEGATIVE_INFINITY;
 }
 
-function targetFromTaskPageTitle(pageTitle: string): { pageTitle: string; section: string } | null {
-    const hashIndex = pageTitle.indexOf('#');
-    if (hashIndex === -1) {
-        return null;
-    }
-
-    const targetPageTitle = pageTitle.slice(0, hashIndex).trim();
-    const section = pageTitle.slice(hashIndex + 1).trim();
-    if (!targetPageTitle || !section) {
-        return null;
-    }
-
-    return {
-        pageTitle: targetPageTitle,
-        section,
-    };
-}
-
-function isSpeedyDeleteTalkTask(task: TrackedTask): boolean {
-    const target = targetFromTaskPageTitle(task.pageTitle);
-    if (!target) {
-        return false;
-    }
-
-    return speedyDeleteTalkPageTitles.has(normalizeComparablePageTitle(target.pageTitle));
-}
-
-function warningFromLabel(key: string, text: string): TaskWarning | null {
-    return text ? { key, text } : null;
-}
-
-function openEditFormWithText(
-    pageTitle: string,
-    text: string,
-    summary: string,
-    targetName: string,
-): void {
-    const form = document.createElement('form');
-    form.method = 'post';
-    form.action = mw.util.getUrl(pageTitle, { action: 'submit' });
-    form.target = targetName;
-    form.style.display = 'none';
-
-    appendHiddenInput(form, 'wpTextbox1', text);
-    appendHiddenInput(form, 'wpSummary', summary);
-    appendHiddenInput(form, 'wpPreview', '1');
-
-    const csrfToken = mw.user.tokens.get('csrfToken');
-    if (csrfToken) {
-        appendHiddenInput(form, 'wpEditToken', csrfToken);
-    }
-
-    document.body.appendChild(form);
-    form.submit();
-    form.remove();
-}
-
-function appendHiddenInput(form: HTMLFormElement, name: string, value: string): void {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = name;
-    input.value = value;
-    form.appendChild(input);
-}
-
-function makePublicDays(wikitext: string): number {
-    const match = /{{\s*(?:subst:\s*)?Make[ _]public\s*\|\s*(\d+)/i.exec(wikitext);
-    if (!match) {
-        return 7;
-    }
-
-    const days = Number(match[1]);
-    return Number.isFinite(days) && days > 0 ? days : 7;
-}
-
-function hasPublicNoticeEnded(task: TrackedTask): boolean {
-    const days = daysUntilUtcDate(task.publicNoticeEnd);
-    return days !== null && days <= 0;
-}
-
 function appendComparisonNotes(notes: string, content: string): string {
     const trimmedContent = content.trim();
     if (!trimmedContent) {
@@ -930,39 +698,4 @@ function appendComparisonNotes(notes: string, content: string): string {
     return notes.trim()
         ? `${notes.replace(/\s*$/, '')}\n${block}`
         : block;
-}
-
-function buildDeleteDataEditRequestWikitext(
-    sectionTitle: string,
-    taskSectionTitle: string,
-    sandboxRevid: number,
-): string {
-    return [
-        '{{subst:提出代為編輯請求',
-        `|章節標題 = ${sectionTitle}`,
-        `|patch = ${deleteDataSandboxTitle}`,
-        '|rfc = ',
-        `|請求內容 = 見 [[${taskSectionTitle}]]。沙盒：[[Special:PermaLink/${sandboxRevid}]]。`,
-        '|簽名 = --~~~~',
-        '}}',
-    ].join('\n');
-}
-
-function insertAfterRfcTemplate(existingSectionWikitext: string, proposedChangesWikitext: string): string {
-    const match = rfcMatchRegex.exec(existingSectionWikitext);
-    const proposed = proposedChangesWikitext.trim();
-    if (!proposed) {
-        return existingSectionWikitext;
-    }
-
-    if (!match) {
-        throw new Error(wgULS('找不到 {{rfc}} 模板', '找不到 {{rfc}} 模板'));
-    }
-
-    const insertIndex = match.index + match[0].length;
-    const before = existingSectionWikitext.slice(0, insertIndex).replace(/\s*$/, '');
-    const after = existingSectionWikitext.slice(insertIndex).replace(/^\s*/, '');
-    return after
-        ? `${before}\n${proposed}\n${after}`
-        : `${before}\n${proposed}\n`;
 }
