@@ -4,6 +4,7 @@ import { rfcTopicOptions, rfcTopics } from './constants';
 import { RFC_EDITOR_TEMPLATE } from './template';
 import { addRFCTemplate, constructEditSummary } from './wikitext';
 import type { RfcDialogData } from './types';
+import { vueCompatOptions } from '../codex';
 
 export type RfcEditorAppInstance = {
     openDialog(data: RfcDialogData): void;
@@ -13,12 +14,7 @@ export function createRfcEditorApp(): object {
     return {
         name: 'NoticeboardRfcEditor',
         template: RFC_EDITOR_TEMPLATE,
-        compatConfig: {
-            MODE: 3,
-        },
-        compilerOptions: {
-            whitespace: 'condense',
-        },
+        ...vueCompatOptions(),
         data() {
             return {
                 open: false,

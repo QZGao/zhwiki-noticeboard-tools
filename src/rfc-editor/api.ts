@@ -1,15 +1,8 @@
 import { findRFCInSection } from './wikitext';
 import type { EditStatus, RfcSectionAnalysis } from './types';
+import { createLazyApi } from '../mediawiki';
 
-let api: any = null;
-
-export function getApi(): any {
-    if (!api) {
-        api = new mw.Api();
-    }
-
-    return api;
-}
+export const getApi = createLazyApi();
 
 export async function fetchAndAnalyseSection(title: string, section: string | null): Promise<RfcSectionAnalysis> {
     const params: Record<string, unknown> = {

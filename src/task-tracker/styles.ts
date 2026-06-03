@@ -1,15 +1,10 @@
 import { ROOT_ID } from './constants';
+import { injectStyle } from '../dom';
 
 const STYLE_ID = `${ROOT_ID}-styles`;
 
 export function injectTaskTrackerStyles(): void {
-    if (document.getElementById(STYLE_ID)) {
-        return;
-    }
-
-    $('<style>')
-        .attr('id', STYLE_ID)
-        .text(`
+    injectStyle(STYLE_ID, `
             .ntt-dialog {
                 box-sizing: border-box;
                 width: min(960px, calc(100vw - 48px));
@@ -206,6 +201,5 @@ export function injectTaskTrackerStyles(): void {
                     justify-content: flex-start;
                 }
             }
-        `)
-        .appendTo(document.head);
+        `);
 }

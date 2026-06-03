@@ -1,5 +1,6 @@
 import type { TaskSeed } from './types';
 import { isSectionOnRfc } from '../rfc-editor/api';
+import { injectStyle } from '../dom';
 import { loadLocalSnapshot } from './storage';
 import {
     cacheCurrentPageHeadingSections,
@@ -142,13 +143,7 @@ function dateFromThreadId(threadId: string | null): string | null {
 }
 
 function injectEditsectionStyle(): void {
-    if (document.getElementById(STYLE_ID)) {
-        return;
-    }
-
-    $('<style>')
-        .attr('id', STYLE_ID)
-        .text(`
+    injectStyle(STYLE_ID, `
             .mw-editsection .${LINK_GROUP_CLASS}::before {
                 content: ' | ';
             }
@@ -156,8 +151,7 @@ function injectEditsectionStyle(): void {
             .mw-editsection .${MANAGE_LINK_CLASS} {
                 font-weight: bold;
             }
-        `)
-        .appendTo(document.head);
+        `);
 }
 
 function loadTrackedPageTitles(): Set<string> {

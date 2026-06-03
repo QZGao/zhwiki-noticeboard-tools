@@ -15,6 +15,7 @@ import { buildPlacedWikitext, placementSection } from './placement';
 import { injectProposedChangesEditorStyles } from './styles';
 import { PROPOSED_CHANGES_EDITOR_TEMPLATE } from './template';
 import type { ProposedChangesEditorOptions } from './types';
+import { vueCompatOptions } from '../codex';
 
 export type ProposedChangesEditorAppInstance = {
     openDialog(options: ProposedChangesEditorOptions): void;
@@ -24,12 +25,7 @@ export function createProposedChangesEditorApp(): object {
     return {
         name: 'NoticeboardProposedChangesEditor',
         template: PROPOSED_CHANGES_EDITOR_TEMPLATE,
-        compatConfig: {
-            MODE: 3,
-        },
-        compilerOptions: {
-            whitespace: 'condense',
-        },
+        ...vueCompatOptions(),
         data() {
             return {
                 open: false,

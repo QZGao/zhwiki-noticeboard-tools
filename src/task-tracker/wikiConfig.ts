@@ -1,5 +1,6 @@
 import { CONFIG_VERSION, getConfigPageTitle, summarySuffix } from './constants';
 import { compareTimestamps, normalizeSnapshot } from './model';
+import { revisionContent, type ApiParams, type ApiRevision } from '../mediawiki';
 import type {
     NoticeboardToolsConfig,
     RemoteConfig,
@@ -12,21 +13,12 @@ type QueryResponse = {
     query: {
         pages: Array<{
             missing?: boolean;
-            revisions?: Array<{
-                content?: string;
-                slots?: {
-                    main?: {
-                        content?: string;
-                        '*': string;
-                    };
-                };
+            revisions?: Array<ApiRevision & {
                 timestamp: string;
             }>;
         }>;
     };
 };
-
-type ApiParams = Record<string, string | number | boolean | string[] | number[] | File | undefined>;
 
 export class WikiConfigClient {
     private readonly api = new mw.Api();
@@ -120,10 +112,6 @@ export class WikiConfigClient {
             snapshot,
         };
     }
-}
-
-function revisionContent(revision: QueryResponse['query']['pages'][number]['revisions'][number]): string {
-    return revision.content ?? revision.slots?.main?.content ?? revision.slots?.main?.['*'] ?? '';
 }
 
 function parseConfig(content: string): NoticeboardToolsConfig {

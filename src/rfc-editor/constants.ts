@@ -1,3 +1,5 @@
+export { summarySuffix } from '../constants';
+
 export const rfcTopicOptions = [
     { value: 'bio', label: wgULS('传记', '傳記') },
     { value: 'econ', label: wgULS('经济、贸易与公司', '經濟、貿易與公司') },
@@ -21,7 +23,6 @@ export function rfcTopicLabel(topic: string): string {
     return rfcTopicOptions.find((option) => option.value === topic)?.label || topic;
 }
 
-export const summarySuffix = ' ([[User:SuperGrey/gadgets/NoticeboardTools|NoticeboardTools]])';
 export const rfcMatchRegex = /{{(?:[Rr]f[Cc](?: subpage)?|[徵征]求意[見见])((?:\|[a-z]+)*?)(?:\|rfcid=([a-z0-9]+))?}}/;
 export const skipMatchRegex = /^\s*{{(存[檔档][自至到]|[Ss]ave ?to|[Aa]rchive(?: ?to)|[Nn]osave|保存至|已?移[動动][自至到]|[Mm]oved?(?:(?: discussion | )?to)?|(?:[Mm]ov|[Ss]av|[Aa]rchiev)ed? ?from|[Ss]witchfrom|[Mm]OVEDFROM|[Mm]oved discussion from)(?:\|.*?)?}}\s*$/;
 

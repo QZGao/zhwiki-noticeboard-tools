@@ -1,13 +1,8 @@
 import { inProgressLinkClass, linkGroupClass, messageClass, styleId } from './constants';
+import { injectStyle } from '../dom';
 
 export function injectRfcEditorStyles(): void {
-    if (document.getElementById(styleId)) {
-        return;
-    }
-
-    $('<style>')
-        .attr('id', styleId)
-        .text(`
+    injectStyle(styleId, `
             .mw-editsection .${linkGroupClass}::before {
                 content: ' | ';
             }
@@ -103,6 +98,5 @@ export function injectRfcEditorStyles(): void {
                     grid-template-columns: 1fr;
                 }
             }
-        `)
-        .appendTo(document.head);
+        `);
 }

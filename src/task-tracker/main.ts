@@ -2,6 +2,8 @@ import { PORTLET_LINK_ID, ROOT_ID } from './constants';
 import { createTaskTrackerApp } from './app';
 import { initEditsectionTrackingLinks } from './editsectionLinks';
 import type { TaskSeed } from './types';
+import { mountCodexApp } from '../codex';
+import { errorMessage } from '../mediawiki';
 
 type TaskTrackerInstance = {
     openDialog(): void;
@@ -79,16 +81,11 @@ async function doMountTaskTracker(): Promise<TaskTrackerInstance> {
     container.id = ROOT_ID;
     document.body.appendChild(container);
 
-    const { createMwApp } = mw.loader.require('vue');
-    const { CdxButton, CdxDialog } = mw.loader.require('@wikimedia/codex');
-    instance = createMwApp(createTaskTrackerApp())
-        .component('CdxButton', CdxButton)
-        .component('CdxDialog', CdxDialog)
-        .mount(container) as TaskTrackerInstance;
+    instance = mountCodexApp<TaskTrackerInstance>(
+        createTaskTrackerApp(),
+        container,
+        ['CdxButton', 'CdxDialog'],
+    );
 
     return instance;
-}
-
-function errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
 }

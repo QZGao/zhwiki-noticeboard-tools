@@ -1,6 +1,8 @@
 import { createRfcEditorApp, type RfcEditorAppInstance } from './app';
 import { getEditRfcGlobal } from './global';
 import type { RfcDialogData } from './types';
+import { mountCodexApp } from '../codex';
+import { getOrCreateElement } from '../dom';
 
 const ROOT_ID = 'noticeboard-tools-rfc-editor-root';
 
@@ -16,18 +18,11 @@ function mountRfcEditor(): RfcEditorAppInstance {
         return instance;
     }
 
-    let container = document.getElementById(ROOT_ID);
-    if (!container) {
-        container = document.createElement('div');
-        container.id = ROOT_ID;
-        document.body.appendChild(container);
-    }
-
-    const { createMwApp } = mw.loader.require('vue');
-    const { CdxDialog } = mw.loader.require('@wikimedia/codex');
-    instance = createMwApp(createRfcEditorApp())
-        .component('CdxDialog', CdxDialog)
-        .mount(container) as RfcEditorAppInstance;
+    instance = mountCodexApp<RfcEditorAppInstance>(
+        createRfcEditorApp(),
+        getOrCreateElement(ROOT_ID),
+        ['CdxDialog'],
+    );
 
     const editRfc = getEditRfcGlobal();
     editRfc.editRFCDialog = createRfcEditorApp;

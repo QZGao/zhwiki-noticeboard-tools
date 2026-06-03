@@ -1,13 +1,9 @@
+import { injectStyle } from '../dom';
+
 const STYLE_ID = 'noticeboard-tools-proposed-changes-editor-styles';
 
 export function injectProposedChangesEditorStyles(): void {
-    if (document.getElementById(STYLE_ID)) {
-        return;
-    }
-
-    $('<style>')
-        .attr('id', STYLE_ID)
-        .text(`
+    injectStyle(STYLE_ID, `
             .pcd-dialog {
                 width: min(920px, calc(100vw - 48px));
                 max-width: calc(100vw - 48px);
@@ -137,6 +133,5 @@ export function injectProposedChangesEditorStyles(): void {
                     min-height: 0;
                 }
             }
-        `)
-        .appendTo(document.head);
+        `);
 }

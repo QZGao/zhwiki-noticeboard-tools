@@ -3,6 +3,8 @@ import {
     type ProposedChangesEditorAppInstance,
 } from './app';
 import type { ProposedChangesEditorOptions } from './types';
+import { mountCodexApp } from '../codex';
+import { getOrCreateElement } from '../dom';
 
 const ROOT_ID = 'noticeboard-tools-proposed-changes-editor-root';
 
@@ -18,18 +20,11 @@ function mountProposedChangesEditor(): ProposedChangesEditorAppInstance {
         return instance;
     }
 
-    let container = document.getElementById(ROOT_ID);
-    if (!container) {
-        container = document.createElement('div');
-        container.id = ROOT_ID;
-        document.body.appendChild(container);
-    }
-
-    const { createMwApp } = mw.loader.require('vue');
-    const { CdxDialog } = mw.loader.require('@wikimedia/codex');
-    instance = createMwApp(createProposedChangesEditorApp())
-        .component('CdxDialog', CdxDialog)
-        .mount(container) as ProposedChangesEditorAppInstance;
+    instance = mountCodexApp<ProposedChangesEditorAppInstance>(
+        createProposedChangesEditorApp(),
+        getOrCreateElement(ROOT_ID),
+        ['CdxDialog'],
+    );
 
     return instance;
 }

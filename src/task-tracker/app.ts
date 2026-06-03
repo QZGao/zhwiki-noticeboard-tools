@@ -20,6 +20,8 @@ import { openRfcEditorForSection } from '../rfc-editor/open';
 import { fetchBulletinLinkedPageTitles, normalizeBulletinPageTitle } from './bulletinStatus';
 import { refreshEditsectionTrackingLinkLabels } from './editsectionLinks';
 import { currentPageTitle, findCurrentPageSection } from './pageSections';
+import { vueCompatOptions } from '../codex';
+import { errorMessage } from '../mediawiki';
 
 const wikiClient = new WikiConfigClient();
 const stageSortOrder: Record<TaskStage, number> = {
@@ -32,12 +34,7 @@ export function createTaskTrackerApp(): object {
     return {
         name: 'NoticeboardTaskTracker',
         template: TASK_TRACKER_TEMPLATE,
-        compatConfig: {
-            MODE: 3,
-        },
-        compilerOptions: {
-            whitespace: 'condense',
-        },
+        ...vueCompatOptions(),
         data() {
             return {
                 open: false,
@@ -548,14 +545,6 @@ function chooseNewerSnapshot(
     }
 
     return null;
-}
-
-function errorMessage(error: unknown): string {
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return String(error);
 }
 
 function isRaceError(error: unknown): boolean {

@@ -4,6 +4,7 @@ import { getEditRfcGlobal } from './global';
 import { openRfcEditorForSection } from './open';
 import { injectRfcEditorStyles } from './styles';
 import type { RfcDialogData } from './types';
+import { errorMessage } from '../mediawiki';
 
 export function initRfcEditor(shouldLoadEditsectionLinks: boolean): void {
     injectRfcEditorStyles();
@@ -97,8 +98,4 @@ async function fetchAndOpenDialog(
             { type: 'error' },
         );
     }
-}
-
-function errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
 }

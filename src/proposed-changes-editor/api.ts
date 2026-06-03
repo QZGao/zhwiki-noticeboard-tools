@@ -1,25 +1,18 @@
 import type { SectionId } from './types';
-
-type ApiParams = Record<string, string | number | boolean | string[] | number[] | File | undefined>;
+import {
+    apiPostWithToken as mediaWikiApiPostWithToken,
+    apiRequest as mediaWikiApiRequest,
+    revisionContent,
+    type ApiParams,
+    type ApiRevision,
+} from '../mediawiki';
 
 type QueryResponse = {
     curtimestamp?: string;
     query: {
         pages: Array<{
             missing?: boolean;
-            revisions?: Array<{
-                content?: string;
-                timestamp?: string;
-                diff?: {
-                    body?: string;
-                };
-                slots?: {
-                    main?: {
-                        content?: string;
-                        '*': string;
-                    };
-                };
-            }>;
+            revisions?: ApiRevision[];
         }>;
     };
 };
@@ -216,10 +209,6 @@ function normalizeSectionAnchor(anchor: string): string {
     return decoded.replace(/ /g, '_');
 }
 
-function revisionContent(revision: QueryResponse['query']['pages'][number]['revisions'][number]): string {
-    return revision.content ?? revision.slots?.main?.content ?? revision.slots?.main?.['*'] ?? '';
-}
-
 function apiGet<T>(params: ApiParams): Promise<T> {
     return apiRequest<T>('get', params);
 }
@@ -229,52 +218,9 @@ function apiPost<T>(params: ApiParams): Promise<T> {
 }
 
 function apiPostWithToken(params: ApiParams): Promise<unknown> {
-    return new Promise((resolve, reject) => {
-        api.postWithToken('csrf', params)
-            .done((data: unknown) => resolve(data))
-            .fail((code: unknown, result: unknown) => {
-                reject(new MediaWikiApiError('postWithToken', code, result, params));
-            });
-    });
+    return mediaWikiApiPostWithToken(api, params);
 }
 
 function apiRequest<T>(method: 'get' | 'post', params: ApiParams): Promise<T> {
-    return new Promise((resolve, reject) => {
-        api[method](params)
-            .done((data: T) => resolve(data))
-            .fail((code: unknown, result: unknown) => {
-                reject(new MediaWikiApiError(method, code, result, params));
-            });
-    });
-}
-
-class MediaWikiApiError extends Error {
-    readonly code: unknown;
-    readonly result: unknown;
-    readonly params: ApiParams;
-
-    constructor(method: string, code: unknown, result: unknown, params: ApiParams) {
-        super(apiErrorMessage(method, code, result));
-        this.name = 'MediaWikiApiError';
-        this.code = code;
-        this.result = result;
-        this.params = params;
-    }
-}
-
-function apiErrorMessage(method: string, code: unknown, result: unknown): string {
-    const info = apiErrorInfo(result);
-    const codeText = String(code || 'unknown');
-    return info
-        ? `MediaWiki API ${method} failed (${codeText}): ${info}`
-        : `MediaWiki API ${method} failed (${codeText})`;
-}
-
-function apiErrorInfo(result: unknown): string {
-    if (!result || typeof result !== 'object') {
-        return '';
-    }
-
-    const error = (result as { error?: { info?: unknown } }).error;
-    return typeof error?.info === 'string' ? error.info : '';
+    return mediaWikiApiRequest<T>(api, method, params);
 }

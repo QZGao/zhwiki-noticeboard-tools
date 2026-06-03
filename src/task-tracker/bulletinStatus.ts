@@ -1,6 +1,7 @@
-const bulletinTitle = 'Template:Bulletin';
+import { bulletinTitle } from '../constants';
+import { createLazyApi } from '../mediawiki';
 
-let api: any = null;
+const getApi = createLazyApi();
 
 export async function fetchBulletinLinkedPageTitles(): Promise<Set<string>> {
     const response = await getApi().get({
@@ -42,12 +43,4 @@ export function normalizeBulletinPageTitle(pageTitle: string): string {
         .replace(/^:/, '')
         .replace(/_/g, ' ')
         .replace(/\s+/g, ' ');
-}
-
-function getApi(): any {
-    if (!api) {
-        api = new mw.Api();
-    }
-
-    return api;
 }
