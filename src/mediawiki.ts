@@ -28,6 +28,7 @@ export type ApiQueryResponse = {
 
 export type CurrentWikitextRevision = {
     content: string;
+    revid: number | null;
     resolvedSection: string | null;
     basetimestamp: string;
     curtimestamp: string;
@@ -161,7 +162,7 @@ export async function fetchPageWikitextRevision(
     const params: ApiParams = {
         action: 'query',
         prop: 'revisions',
-        rvprop: ['content', 'timestamp'],
+        rvprop: ['content', 'ids', 'timestamp'],
         rvslots: 'main',
         titles: pageTitle,
         formatversion: '2',
@@ -185,6 +186,7 @@ export async function fetchPageWikitextRevision(
         if (options.allowMissing) {
             return {
                 content: '',
+                revid: null,
                 resolvedSection,
                 basetimestamp: '',
                 curtimestamp: data.curtimestamp || '',
@@ -201,6 +203,7 @@ export async function fetchPageWikitextRevision(
 
     return {
         content: revisionContent(revision),
+        revid: typeof revision.revid === 'number' ? revision.revid : null,
         resolvedSection,
         basetimestamp: revision.timestamp || '',
         curtimestamp: data.curtimestamp || '',
@@ -306,6 +309,30 @@ export async function saveWikitextRevision(
     }
 
     await apiPostWithToken(defaultApi(), params);
+}
+
+export async function saveWikitextWithBaseRevision(
+    api: any,
+    pageTitle: string,
+    section: string | null,
+    baseRevisionId: number,
+    wikitext: string,
+    summary: string,
+): Promise<unknown> {
+    const params: ApiParams = {
+        action: 'edit',
+        title: pageTitle,
+        baserevid: baseRevisionId,
+        text: wikitext,
+        summary,
+        formatversion: '2',
+    };
+
+    if (section !== null) {
+        params.section = section;
+    }
+
+    return apiPostWithToken(api, params);
 }
 
 export function apiRequest<T>(api: any, method: 'get' | 'post', params: ApiParams): Promise<T> {

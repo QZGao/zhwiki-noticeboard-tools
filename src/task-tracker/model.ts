@@ -1,5 +1,6 @@
 import { TASK_TRACKER_VERSION } from './constants';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
+import { nowIsoString, utcDateString } from '../datetime';
 
 const stageValues = new Set<TaskStage>(['proposal', 'publicNotice', 'closed']);
 
@@ -8,7 +9,7 @@ export function createTask(seed: TaskSeed = {}): TrackedTask {
         id: createId(),
         title: '',
         pageTitle: mw.config.get('wgPageName')?.replace(/_/g, ' ') || '',
-        createdAt: today(),
+        createdAt: utcDateString(),
         stage: 'proposal',
         hasRfc: false,
         hasBulletin: false,
@@ -25,7 +26,7 @@ export function createTask(seed: TaskSeed = {}): TrackedTask {
     };
 }
 
-export function createSnapshot(tasks: TrackedTask[], updatedAt = now()): TaskTrackerSnapshot {
+export function createSnapshot(tasks: TrackedTask[], updatedAt = nowIsoString()): TaskTrackerSnapshot {
     return {
         version: TASK_TRACKER_VERSION,
         updatedAt,
@@ -45,7 +46,7 @@ export function normalizeSnapshot(value: unknown): TaskTrackerSnapshot | null {
 
     return {
         version: TASK_TRACKER_VERSION,
-        updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now(),
+        updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : nowIsoString(),
         tasks: candidate.tasks.map(normalizeTask),
     };
 }
@@ -58,36 +59,6 @@ export function compareTimestamps(left?: string, right?: string): number {
     return timestampValue(left) - timestampValue(right);
 }
 
-export function now(): string {
-    return new Date().toISOString();
-}
-
-export function today(): string {
-    const date = new Date();
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-export function daysSince(dateString: string): number | null {
-    const start = dateOnlyValue(dateString);
-    if (start === null) {
-        return null;
-    }
-
-    return Math.floor((dateOnlyValue(today())! - start) / 86400000);
-}
-
-export function daysUntil(dateString: string): number | null {
-    const end = dateOnlyValue(dateString);
-    if (end === null) {
-        return null;
-    }
-
-    return Math.ceil((end - dateOnlyValue(today())!) / 86400000);
-}
-
 function normalizeTask(task: Partial<TrackedTask>): TrackedTask {
     const normalizedStage = stageValues.has(task.stage as TaskStage) ? task.stage as TaskStage : 'proposal';
 
@@ -95,7 +66,7 @@ function normalizeTask(task: Partial<TrackedTask>): TrackedTask {
         id: typeof task.id === 'string' && task.id ? task.id : createId(),
         title: typeof task.title === 'string' ? task.title : '',
         pageTitle: typeof task.pageTitle === 'string' ? task.pageTitle : '',
-        createdAt: typeof task.createdAt === 'string' ? task.createdAt : today(),
+        createdAt: typeof task.createdAt === 'string' ? task.createdAt : utcDateString(),
         stage: normalizedStage,
         hasRfc: Boolean(task.hasRfc),
         hasBulletin: Boolean(task.hasBulletin),
@@ -122,13 +93,4 @@ function timestampValue(value?: string): number {
 
     const parsed = Date.parse(value);
     return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-function dateOnlyValue(dateString: string): number | null {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-        return null;
-    }
-
-    const [year, month, day] = dateString.split('-').map(Number);
-    return Date.UTC(year, month - 1, day);
 }

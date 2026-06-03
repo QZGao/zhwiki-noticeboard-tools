@@ -1,31 +1,20 @@
 import { findRFCInSection } from './wikitext';
 import type { EditStatus, RfcSectionAnalysis } from './types';
-import { createLazyApi } from '../mediawiki';
+import {
+    createLazyApi,
+    fetchPageWikitextRevision,
+    saveWikitextWithBaseRevision,
+} from '../mediawiki';
 
 export const getApi = createLazyApi();
 
 export async function fetchAndAnalyseSection(title: string, section: string | null): Promise<RfcSectionAnalysis> {
-    const params: Record<string, unknown> = {
-        action: 'query',
-        prop: 'revisions',
-        titles: title,
-        rvslots: 'main',
-        rvprop: 'content|ids',
-        formatversion: 2,
-    };
-
-    if (section !== null) {
-        params.rvsection = section;
+    const revision = await fetchPageWikitextRevision(getApi(), title, { section });
+    if (revision.revid === null) {
+        throw new Error('missing page revision id');
     }
 
-    const response = await getApi().get(params);
-    const page = response.query.pages[0];
-    if (!page || page.missing) {
-        throw new Error('Page not found');
-    }
-
-    const revision = page.revisions[0];
-    const content = revision.slots.main.content;
+    const content = revision.content;
     const rfcData = findRFCInSection(content);
 
     return {
@@ -48,21 +37,15 @@ export async function doEdit(
     content: string,
     summary: string,
 ): Promise<EditStatus> {
-    const params: Record<string, unknown> = {
-        action: 'edit',
-        title,
-        baserevid,
-        text: content,
-        summary,
-        formatversion: 2,
-    };
-
-    if (section !== null) {
-        params.section = section;
-    }
-
     try {
-        const response = await getApi().postWithEditToken(params);
+        const response = await saveWikitextWithBaseRevision(
+            getApi(),
+            title,
+            section,
+            baserevid,
+            content,
+            summary,
+        );
         return { success: true, response };
     } catch (error) {
         return { success: false, error };

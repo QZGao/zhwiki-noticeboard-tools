@@ -2,10 +2,7 @@ import {
     compareTimestamps,
     createSnapshot,
     createTask,
-    daysSince,
-    daysUntil,
     normalizeSnapshot,
-    today,
 } from './model';
 import { loadLocalSnapshot, saveLocalSnapshot } from './storage';
 import { injectTaskTrackerStyles } from './styles';
@@ -13,7 +10,19 @@ import { TASK_TRACKER_TEMPLATE } from './template';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 import { WikiConfigClient } from './wikiConfig';
 import { openProposedChangesEditor } from '../proposed-changes-editor';
-import { fetchCurrentWikitext, fetchLatestRevisionId } from '../mediawiki';
+import { errorMessage, fetchCurrentWikitext, fetchLatestRevisionId } from '../mediawiki';
+import {
+    addUtcDays,
+    daysSinceUtcDate,
+    daysUntilUtcDate,
+    formatChineseUtcTimestamp,
+    utcDateString,
+    utcDateValue,
+} from '../datetime';
+import {
+    normalizeComparablePageTitle,
+    wikiPageUrl,
+} from '../wikiTitle';
 import { summarySuffix } from './constants';
 import { rfcMatchRegex } from '../rfc-editor/constants';
 import { isSectionOnRfc } from '../rfc-editor/api';
@@ -28,7 +37,6 @@ import {
     extractComparisonTemplateContent,
 } from './publicNoticeWikitext';
 import { vueCompatOptions } from '../codex';
-import { errorMessage } from '../mediawiki';
 
 const wikiClient = new WikiConfigClient();
 const stageSortOrder: Record<TaskStage, number> = {
@@ -213,7 +221,7 @@ export function createTaskTrackerApp(): object {
                 this.refreshCurrentPageRfcStatuses();
             },
             openBulletinPage(): void {
-                const opened = window.open('https://zh.wikipedia.org/wiki/Template:Bulletin', '_blank', 'noopener,noreferrer');
+                const opened = window.open(wikiPageUrl('Template:Bulletin'), '_blank', 'noopener,noreferrer');
                 if (opened) {
                     opened.opener = null;
                 }
@@ -223,7 +231,7 @@ export function createTaskTrackerApp(): object {
                     return;
                 }
 
-                const url = `https://zh.wikipedia.org/wiki/${encodeWikiTitle(task.pageTitle)}`;
+                const url = wikiPageUrl(task.pageTitle);
                 const opened = window.open(url, '_blank', 'noopener,noreferrer');
                 if (opened) {
                     opened.opener = null;
@@ -296,7 +304,7 @@ export function createTaskTrackerApp(): object {
                 return createSnapshot(this.tasks, this.updatedAt || new Date().toISOString());
             },
             proposalAgeLabel(task: TrackedTask): string {
-                const days = daysSince(task.createdAt);
+                const days = daysSinceUtcDate(task.createdAt);
                 if (days === null) {
                     return wgULS('发起日期未设置', '發起日期未設定');
                 }
@@ -308,7 +316,7 @@ export function createTaskTrackerApp(): object {
                     return '';
                 }
 
-                const days = daysUntil(task.publicNoticeEnd);
+                const days = daysUntilUtcDate(task.publicNoticeEnd);
                 if (days === null) {
                     return wgULS('公示期限未设置', '公示期限未設定');
                 }
@@ -361,7 +369,7 @@ export function createTaskTrackerApp(): object {
                 return {
                     key: 'speedy-delete-data',
                     text: wgULS('公示结束后请修改', '公示結束後請修改'),
-                    link: `https://zh.wikipedia.org/wiki/${encodeWikiTitle('Module:Delete/data')}`,
+                    link: wikiPageUrl('Module:Delete/data'),
                 };
             },
             taskWarnings(task: TrackedTask): TaskWarning[] {
@@ -456,7 +464,7 @@ export function createTaskTrackerApp(): object {
                     onSaved: (data) => {
                         const noticeDays = makePublicDays(data.proposedWikitext);
                         const endTimestamp = addUtcDays(new Date(), noticeDays);
-                        const startDate = today();
+                        const startDate = utcDateString();
                         task.publicNoticeStart = startDate;
                         task.publicNoticeEnd = utcDateString(endTimestamp);
                         task.isPublicNotice = true;
@@ -829,12 +837,7 @@ function compareDisplayTasks(
 }
 
 function createdAtSortValue(dateString: string): number {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-        return Number.NEGATIVE_INFINITY;
-    }
-
-    const value = Date.parse(`${dateString}T00:00:00Z`);
-    return Number.isNaN(value) ? Number.NEGATIVE_INFINITY : value;
+    return utcDateValue(dateString) ?? Number.NEGATIVE_INFINITY;
 }
 
 function targetFromTaskPageTitle(pageTitle: string): { pageTitle: string; section: string } | null {
@@ -902,14 +905,6 @@ function appendHiddenInput(form: HTMLFormElement, name: string, value: string): 
     form.appendChild(input);
 }
 
-function normalizeComparablePageTitle(pageTitle: string): string {
-    return pageTitle
-        .trim()
-        .replace(/_/g, ' ')
-        .replace(/\s+/g, ' ')
-        .toLowerCase();
-}
-
 function makePublicDays(wikitext: string): number {
     const match = /{{\s*(?:subst:\s*)?Make[ _]public\s*\|\s*(\d+)/i.exec(wikitext);
     if (!match) {
@@ -921,7 +916,7 @@ function makePublicDays(wikitext: string): number {
 }
 
 function hasPublicNoticeEnded(task: TrackedTask): boolean {
-    const days = daysUntil(task.publicNoticeEnd);
+    const days = daysUntilUtcDate(task.publicNoticeEnd);
     return days !== null && days <= 0;
 }
 
@@ -953,30 +948,6 @@ function buildDeleteDataEditRequestWikitext(
     ].join('\n');
 }
 
-function addUtcDays(date: Date, days: number): Date {
-    return new Date(date.getTime() + days * 86400000);
-}
-
-function utcDateString(date: Date): string {
-    return [
-        date.getUTCFullYear(),
-        String(date.getUTCMonth() + 1).padStart(2, '0'),
-        String(date.getUTCDate()).padStart(2, '0'),
-    ].join('-');
-}
-
-function formatChineseUtcTimestamp(date: Date): string {
-    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-    return [
-        `${date.getUTCFullYear()}年`,
-        `${date.getUTCMonth() + 1}月`,
-        `${date.getUTCDate()}日 `,
-        `(${weekdays[date.getUTCDay()]}) `,
-        `${String(date.getUTCHours()).padStart(2, '0')}:`,
-        `${String(date.getUTCMinutes()).padStart(2, '0')} (UTC)`,
-    ].join('');
-}
-
 function insertAfterRfcTemplate(existingSectionWikitext: string, proposedChangesWikitext: string): string {
     const match = rfcMatchRegex.exec(existingSectionWikitext);
     const proposed = proposedChangesWikitext.trim();
@@ -994,12 +965,4 @@ function insertAfterRfcTemplate(existingSectionWikitext: string, proposedChanges
     return after
         ? `${before}\n${proposed}\n${after}`
         : `${before}\n${proposed}\n`;
-}
-
-function encodeWikiTitle(pageTitle: string): string {
-    return pageTitle
-        .replace(/ /g, '_')
-        .split('#')
-        .map(encodeURIComponent)
-        .join('#');
 }
