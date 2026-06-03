@@ -1,7 +1,7 @@
 import type { ProposedChangesPlacement, SectionId } from './types';
 
 export function placementSection(placement: ProposedChangesPlacement): SectionId | null {
-    if (placement.type === 'manual') {
+    if (placement.type === 'manual' || placement.type === 'full-replace') {
         return placement.section ?? null;
     }
 
@@ -15,6 +15,10 @@ export async function buildPlacedWikitext(
 ): Promise<string> {
     if (placement.type === 'manual') {
         return placement.buildSectionText(existingWikitext, proposedWikitext);
+    }
+
+    if (placement.type === 'full-replace') {
+        return proposedWikitext;
     }
 
     if (placement.type === 'append-section-start') {

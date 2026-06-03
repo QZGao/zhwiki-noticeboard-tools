@@ -13,6 +13,7 @@ import { TASK_TRACKER_TEMPLATE } from './template';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 import { WikiConfigClient } from './wikiConfig';
 import { openProposedChangesEditor } from '../proposed-changes-editor';
+import { fetchCurrentWikitext } from '../proposed-changes-editor/api';
 import { summarySuffix } from './constants';
 import { rfcMatchRegex } from '../rfc-editor/constants';
 import { isSectionOnRfc } from '../rfc-editor/api';
@@ -20,6 +21,12 @@ import { openRfcEditorForSection } from '../rfc-editor/open';
 import { fetchBulletinLinkedPageTitles, normalizeBulletinPageTitle } from './bulletinStatus';
 import { refreshEditsectionTrackingLinkLabels } from './editsectionLinks';
 import { currentPageTitle, findCurrentPageSection } from './pageSections';
+import {
+    commentPublicNoticeTemplates,
+    containsComparisonTemplateContent,
+    containsRemovablePublicNoticeTemplates,
+    extractComparisonTemplateContent,
+} from './publicNoticeWikitext';
 import { vueCompatOptions } from '../codex';
 import { errorMessage } from '../mediawiki';
 
@@ -52,6 +59,8 @@ export function createTaskTrackerApp(): object {
                 bulletinLinkedPageTitles: null as string[] | null,
                 bulletinStatusByPageTitle: {} as Record<string, boolean | undefined>,
                 bulletinStatusRefreshPromise: null as Promise<void> | null,
+                comparisonTemplateStatusByPageTitle: {} as Record<string, boolean | undefined>,
+                comparisonTemplateStatusPromisesByPageTitle: {} as Record<string, Promise<void> | undefined>,
                 stageOptions: [
                     { value: 'proposal' as TaskStage, label: '提案' },
                     { value: 'publicNotice' as TaskStage, label: '公示' },
@@ -92,6 +101,7 @@ export function createTaskTrackerApp(): object {
                     refreshEditsectionTrackingLinkLabels(this.tasks);
                     this.refreshCurrentPageRfcStatuses();
                     this.refreshBulletinStatusesFromCache();
+                    this.refreshComparisonTemplateStatuses();
                 },
                 deep: true,
             },
@@ -103,7 +113,10 @@ export function createTaskTrackerApp(): object {
         methods: {
             openDialog(): void {
                 this.open = true;
-                void this.ensureLoaded().then(() => this.refreshBulletinStatusesForDialogOpen());
+                void this.ensureLoaded().then(() => {
+                    void this.refreshBulletinStatusesForDialogOpen();
+                    this.refreshComparisonTemplateStatuses(true);
+                });
             },
             async addOrOpenTask(seed: TaskSeed): Promise<void> {
                 this.open = true;
@@ -263,6 +276,7 @@ export function createTaskTrackerApp(): object {
                 this.isHydrating = false;
                 refreshEditsectionTrackingLinkLabels(this.tasks);
                 this.refreshCurrentPageRfcStatuses();
+                this.refreshComparisonTemplateStatuses();
             },
             currentSnapshot(): TaskTrackerSnapshot {
                 return createSnapshot(this.tasks, this.updatedAt || new Date().toISOString());
@@ -296,12 +310,16 @@ export function createTaskTrackerApp(): object {
                 return wgULS(`公示尚余 ${days} 日`, `公示尚餘 ${days} 日`);
             },
             isPublicNoticeOverdue(task: TrackedTask): boolean {
-                if (!task.isPublicNotice) {
-                    return false;
-                }
-
-                const days = daysUntil(task.publicNoticeEnd);
-                return days !== null && days <= 0;
+                return task.isPublicNotice && hasPublicNoticeEnded(task);
+            },
+            canSendPublicNoticePassedMessage(task: TrackedTask): boolean {
+                return task.isPublicNotice
+                    && hasPublicNoticeEnded(task)
+                    && targetFromTaskPageTitle(task.pageTitle) !== null;
+            },
+            canDehydrateComparisonTemplate(task: TrackedTask): boolean {
+                return hasPublicNoticeEnded(task)
+                    && this.comparisonTemplateStatusByPageTitle[task.pageTitle] === true;
             },
             stageLabel(stage: TaskStage): string {
                 return this.stageOptions.find((option: { value: TaskStage }) => option.value === stage)?.label || '提案';
@@ -382,10 +400,8 @@ export function createTaskTrackerApp(): object {
                 }
             },
             openPublicNoticeMessageEditor(task: TrackedTask): void {
-                const target = targetFromTaskPageTitle(task.pageTitle);
+                const target = this.taskTargetOrNotify(task);
                 if (!target) {
-                    this.statusMessage = wgULS('页面栏位需要包含章节锚点', '頁面欄位需要包含章節錨點');
-                    mw.notify(this.statusMessage, { type: 'error' });
                     return;
                 }
 
@@ -423,6 +439,61 @@ export function createTaskTrackerApp(): object {
                     },
                 });
             },
+            openPublicNoticePassedMessageEditor(task: TrackedTask): void {
+                const target = this.taskTargetOrNotify(task);
+                if (!target) {
+                    return;
+                }
+
+                openProposedChangesEditor({
+                    pageTitle: target.pageTitle,
+                    placement: {
+                        type: 'append-section-end',
+                        section: target.section,
+                    },
+                    initialWikitext: ':: 公示通過。--~~~~',
+                    dialogTitle: wgULS('发送公示通过留言', '發送公示通過留言'),
+                    editSummary: wgULS('发送公示通过留言', '發送公示通過留言') + summarySuffix,
+                    onSaved: (data) => {
+                        task.isPublicNotice = false;
+
+                        if (
+                            !task.hasRfc
+                            || !containsRemovablePublicNoticeTemplates(data.placedWikitext)
+                            || !confirm(wgULS(
+                                '已发送公示通过留言。是否注释移除 {{rfc}} / {{Make public/rfc}}？',
+                                '已發送公示通過留言。是否註解移除 {{rfc}} / {{Make public/rfc}}？',
+                            ))
+                        ) {
+                            return;
+                        }
+
+                        const commentedWikitext = commentPublicNoticeTemplates(data.placedWikitext);
+                        if (commentedWikitext === data.placedWikitext) {
+                            return;
+                        }
+
+                        setTimeout(() => {
+                            this.openPublicNoticeTemplateRemovalEditor(target, commentedWikitext);
+                        }, 0);
+                    },
+                });
+            },
+            openPublicNoticeTemplateRemovalEditor(
+                target: { pageTitle: string; section: string },
+                wikitext: string,
+            ): void {
+                openProposedChangesEditor({
+                    pageTitle: target.pageTitle,
+                    placement: {
+                        type: 'full-replace',
+                        section: target.section,
+                    },
+                    initialWikitext: wikitext,
+                    dialogTitle: wgULS('注释公示相关模板', '註解公示相關模板'),
+                    editSummary: wgULS('注释公示相关模板', '註解公示相關模板') + summarySuffix,
+                });
+            },
             openMakePublicRfcEditor(
                 target: { pageTitle: string; section: string },
                 days: number,
@@ -439,6 +510,30 @@ export function createTaskTrackerApp(): object {
                     dialogTitle: wgULS('加入公示RfC模板', '加入公示RfC模板'),
                     editSummary: wgULS('加入公示RfC模板', '加入公示RfC模板') + summarySuffix,
                 });
+            },
+            async dehydrateComparisonTemplate(task: TrackedTask): Promise<void> {
+                const target = this.taskTargetOrNotify(task);
+                if (!target) {
+                    return;
+                }
+
+                try {
+                    const sectionWikitext = await fetchCurrentWikitext(target.pageTitle, target.section);
+                    const content = extractComparisonTemplateContent(sectionWikitext);
+                    if (content === null) {
+                        this.comparisonTemplateStatusByPageTitle[task.pageTitle] = false;
+                        this.statusMessage = wgULS('找不到可脱水的比较条文', '找不到可脫水的比較條文');
+                        mw.notify(this.statusMessage, { type: 'warn' });
+                        return;
+                    }
+
+                    task.notes = appendComparisonNotes(task.notes, content);
+                    this.statusMessage = wgULS('已将比较条文内容加入备注', '已將比較條文內容加入備註');
+                } catch (error) {
+                    console.error('Failed to dehydrate comparison template:', error);
+                    this.statusMessage = wgULS('脱水比较条文失败：', '脫水比較條文失敗：') + errorMessage(error);
+                    mw.notify(this.statusMessage, { type: 'error' });
+                }
             },
             refreshCurrentPageRfcStatuses(): void {
                 for (const task of this.tasks) {
@@ -467,6 +562,58 @@ export function createTaskTrackerApp(): object {
 
                 this.rfcStatusPromisesByPageTitle[pageTitle] = promise;
                 return promise;
+            },
+            refreshComparisonTemplateStatuses(force = false): void {
+                if (force) {
+                    this.comparisonTemplateStatusByPageTitle = {};
+                    this.comparisonTemplateStatusPromisesByPageTitle = {};
+                }
+
+                for (const task of this.tasks) {
+                    const target = targetFromTaskPageTitle(task.pageTitle);
+                    if (!hasPublicNoticeEnded(task) || !target) {
+                        continue;
+                    }
+
+                    if (this.comparisonTemplateStatusByPageTitle[task.pageTitle] !== undefined) {
+                        continue;
+                    }
+
+                    void this.fetchComparisonTemplateStatus(task.pageTitle, target);
+                }
+            },
+            async fetchComparisonTemplateStatus(
+                pageTitle: string,
+                target: { pageTitle: string; section: string },
+            ): Promise<void> {
+                if (this.comparisonTemplateStatusPromisesByPageTitle[pageTitle]) {
+                    return this.comparisonTemplateStatusPromisesByPageTitle[pageTitle];
+                }
+
+                const promise = (async () => {
+                    try {
+                        const sectionWikitext = await fetchCurrentWikitext(target.pageTitle, target.section);
+                        this.comparisonTemplateStatusByPageTitle[pageTitle] = containsComparisonTemplateContent(sectionWikitext);
+                    } catch (error) {
+                        console.warn('Failed to detect comparison template for tracked task:', error);
+                        this.comparisonTemplateStatusByPageTitle[pageTitle] = false;
+                    } finally {
+                        delete this.comparisonTemplateStatusPromisesByPageTitle[pageTitle];
+                    }
+                })();
+
+                this.comparisonTemplateStatusPromisesByPageTitle[pageTitle] = promise;
+                return promise;
+            },
+            taskTargetOrNotify(task: TrackedTask): { pageTitle: string; section: string } | null {
+                const target = targetFromTaskPageTitle(task.pageTitle);
+                if (target) {
+                    return target;
+                }
+
+                this.statusMessage = wgULS('页面栏位需要包含章节锚点', '頁面欄位需要包含章節錨點');
+                mw.notify(this.statusMessage, { type: 'error' });
+                return null;
             },
             isEditing(task: TrackedTask): boolean {
                 return this.editingTaskId === task.id;
@@ -612,6 +759,23 @@ function makePublicDays(wikitext: string): number {
 
     const days = Number(match[1]);
     return Number.isFinite(days) && days > 0 ? days : 7;
+}
+
+function hasPublicNoticeEnded(task: TrackedTask): boolean {
+    const days = daysUntil(task.publicNoticeEnd);
+    return days !== null && days <= 0;
+}
+
+function appendComparisonNotes(notes: string, content: string): string {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+        return notes;
+    }
+
+    const block = `==========比較條文==========\n${trimmedContent}`;
+    return notes.trim()
+        ? `${notes.replace(/\s*$/, '')}\n${block}`
+        : block;
 }
 
 function addUtcDays(date: Date, days: number): Date {

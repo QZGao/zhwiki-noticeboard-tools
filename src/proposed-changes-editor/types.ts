@@ -12,6 +12,10 @@ export type ProposedChangesPlacement =
         separator?: string;
     }
     | {
+        type: 'full-replace';
+        section?: SectionId | null;
+    }
+    | {
         type: 'manual';
         section?: SectionId | null;
         buildSectionText(

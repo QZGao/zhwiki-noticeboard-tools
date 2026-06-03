@@ -138,7 +138,15 @@ export const TASK_TRACKER_TEMPLATE = `
                             <input v-model="task.publicNoticeStart" type="date" @click.stop>
                         </label>
                         <label class="ntt-field">
-                            <span>${wgULS('公示结束', '公示結束')}</span>
+                            <span>
+                                ${wgULS('公示结束', '公示結束')}
+                                <a
+                                    v-if="canSendPublicNoticePassedMessage(task)"
+                                    href="#"
+                                    class="ntt-field-link"
+                                    @click.prevent.stop="openPublicNoticePassedMessageEditor(task)"
+                                >${wgULS('发送「公示通过」留言', '發送「公示通過」留言')}</a>
+                            </span>
                             <input v-model="task.publicNoticeEnd" type="date" @click.stop>
                         </label>
                     </div>
@@ -181,7 +189,15 @@ export const TASK_TRACKER_TEMPLATE = `
                     </div>
 
                     <label class="ntt-field">
-                        <span>${wgULS('备注', '備註')}</span>
+                        <span>
+                            ${wgULS('备注', '備註')}
+                            <a
+                                v-if="canDehydrateComparisonTemplate(task)"
+                                href="#"
+                                class="ntt-field-link"
+                                @click.prevent.stop="dehydrateComparisonTemplate(task)"
+                            >${wgULS('脱水「比较条文」', '脫水「比較條文」')}</a>
+                        </span>
                         <textarea v-model="task.notes" @click.stop></textarea>
                     </label>
 
