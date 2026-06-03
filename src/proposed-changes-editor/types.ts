@@ -16,6 +16,9 @@ export type ProposedChangesPlacement =
         section?: SectionId | null;
     }
     | {
+        type: 'new-section';
+    }
+    | {
         type: 'manual';
         section?: SectionId | null;
         buildSectionText(

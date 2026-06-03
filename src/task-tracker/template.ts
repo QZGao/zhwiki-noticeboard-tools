@@ -207,6 +207,12 @@ export const TASK_TRACKER_TEMPLATE = `
                                 class="ntt-field-link"
                                 @click.prevent.stop="openDeleteDataSandboxEditor"
                             >${wgULS('覆盖并编辑Module:Delete/data/sandbox', '覆蓋並編輯Module:Delete/data/sandbox')}</a>
+                            <a
+                                v-if="canSendDeleteDataEditRequest(task)"
+                                href="#"
+                                class="ntt-field-link"
+                                @click.prevent.stop="openDeleteDataEditRequestEditor(task)"
+                            >${wgULS('发送编辑请求到Module talk:Delete/data', '發送編輯請求到Module talk:Delete/data')}</a>
                         </span>
                         <textarea v-model="task.notes" @click.stop></textarea>
                     </label>

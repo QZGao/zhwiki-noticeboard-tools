@@ -122,6 +122,27 @@ export async function fetchWikitextDiff(
     return data.query.pages[0]?.revisions?.[0]?.diff?.body || '';
 }
 
+export async function fetchLatestRevisionId(pageTitle: string): Promise<number> {
+    const data = await apiGet<QueryResponse>({
+        action: 'query',
+        prop: 'revisions',
+        rvprop: 'ids',
+        titles: pageTitle,
+        formatversion: '2',
+    });
+    const page = data.query.pages[0];
+    if (!page || page.missing) {
+        throw new Error(wgULS('页面不存在', '頁面不存在'));
+    }
+
+    const revid = page.revisions?.[0]?.revid;
+    if (typeof revid !== 'number') {
+        throw new Error('missing page revision id');
+    }
+
+    return revid;
+}
+
 export async function saveWikitextRevision(
     pageTitle: string,
     section: string | null,

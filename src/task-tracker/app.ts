@@ -13,7 +13,7 @@ import { TASK_TRACKER_TEMPLATE } from './template';
 import type { TaskSeed, TaskStage, TaskTrackerSnapshot, TrackedTask } from './types';
 import { WikiConfigClient } from './wikiConfig';
 import { openProposedChangesEditor } from '../proposed-changes-editor';
-import { fetchCurrentWikitext } from '../proposed-changes-editor/api';
+import { fetchCurrentWikitext, fetchLatestRevisionId } from '../proposed-changes-editor/api';
 import { summarySuffix } from './constants';
 import { rfcMatchRegex } from '../rfc-editor/constants';
 import { isSectionOnRfc } from '../rfc-editor/api';
@@ -43,6 +43,7 @@ const speedyDeleteTalkPageTitles = new Set([
 ]);
 const deleteDataTitle = 'Module:Delete/data';
 const deleteDataSandboxTitle = 'Module:Delete/data/sandbox';
+const deleteDataTalkTitle = 'Module talk:Delete/data';
 
 type TaskWarning = {
     key: string;
@@ -336,6 +337,9 @@ export function createTaskTrackerApp(): object {
             canOpenDeleteDataSandboxEditor(task: TrackedTask): boolean {
                 return task.stage !== 'closed' && isSpeedyDeleteTalkTask(task);
             },
+            canSendDeleteDataEditRequest(task: TrackedTask): boolean {
+                return this.canOpenDeleteDataSandboxEditor(task);
+            },
             stageLabel(stage: TaskStage): string {
                 return this.stageOptions.find((option: { value: TaskStage }) => option.value === stage)?.label || '提案';
             },
@@ -598,6 +602,41 @@ export function createTaskTrackerApp(): object {
                     if (opened) {
                         opened.close();
                     }
+                }
+            },
+            async openDeleteDataEditRequestEditor(task: TrackedTask): Promise<void> {
+                const target = this.taskTargetOrNotify(task);
+                if (!target) {
+                    return;
+                }
+
+                try {
+                    const date = utcDateString(new Date());
+                    const sectionTitle = `編輯請求 ${date}`;
+                    const sandboxRevid = await fetchLatestRevisionId(deleteDataSandboxTitle);
+                    openProposedChangesEditor({
+                        pageTitle: deleteDataTalkTitle,
+                        placement: {
+                            type: 'new-section',
+                        },
+                        initialWikitext: buildDeleteDataEditRequestWikitext(
+                            sectionTitle,
+                            `${target.pageTitle}#${target.section}`,
+                            sandboxRevid,
+                        ),
+                        dialogTitle: wgULS(
+                            '发送编辑请求到Module talk:Delete/data',
+                            '發送編輯請求到Module talk:Delete/data',
+                        ),
+                        editSummary: sectionTitle + summarySuffix,
+                    });
+                } catch (error) {
+                    console.error('Failed to open Module:Delete/data edit request editor:', error);
+                    this.statusMessage = wgULS(
+                        '载入 Module:Delete/data/sandbox 版本失败：',
+                        '載入 Module:Delete/data/sandbox 版本失敗：',
+                    ) + errorMessage(error);
+                    mw.notify(this.statusMessage, { type: 'error' });
                 }
             },
             refreshCurrentPageRfcStatuses(): void {
@@ -896,6 +935,22 @@ function appendComparisonNotes(notes: string, content: string): string {
     return notes.trim()
         ? `${notes.replace(/\s*$/, '')}\n${block}`
         : block;
+}
+
+function buildDeleteDataEditRequestWikitext(
+    sectionTitle: string,
+    taskSectionTitle: string,
+    sandboxRevid: number,
+): string {
+    return [
+        '{{subst:提出代為編輯請求',
+        `|章節標題 = ${sectionTitle}`,
+        `|patch = ${deleteDataSandboxTitle}`,
+        '|rfc = ',
+        `|請求內容 = 見 [[${taskSectionTitle}]]。沙盒：[[Special:PermaLink/${sandboxRevid}]]。`,
+        '|簽名 = --~~~~',
+        '}}',
+    ].join('\n');
 }
 
 function addUtcDays(date: Date, days: number): Date {

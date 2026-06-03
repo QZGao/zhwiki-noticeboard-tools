@@ -277,11 +277,12 @@ export function createProposedChangesEditorApp(): object {
                         current.content,
                         this.proposedWikitext,
                     );
+                    const isNewSection = this.options.placement.type === 'new-section';
 
                     await saveWikitextRevision(
                         this.options.pageTitle,
-                        current.resolvedSection,
-                        placedWikitext,
+                        isNewSection ? 'new' : current.resolvedSection,
+                        isNewSection ? this.proposedWikitext.trim() : placedWikitext,
                         this.options.editSummary || this.dialogTitle,
                         current.basetimestamp,
                         current.curtimestamp,
