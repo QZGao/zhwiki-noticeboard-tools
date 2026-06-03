@@ -58,6 +58,22 @@ export const TASK_TRACKER_TEMPLATE = `
                                 {{ publicNoticeLabel(task) }}
                             </span>
                         </div>
+                        <div v-if="taskWarnings(task).length" class="ntt-task-warnings">
+                            <strong
+                                v-for="warning in taskWarnings(task)"
+                                :key="warning.key"
+                                class="ntt-warning"
+                            >
+                                {{ warning.text }}
+                                <a
+                                    v-if="warning.link"
+                                    :href="warning.link"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    @click.stop
+                                >Module:Delete/data</a>
+                            </strong>
+                        </div>
                         <div class="ntt-task-flags">
                             <span v-if="task.hasRfc">RfC</span>
                             <span v-if="task.hasBulletin">${wgULS('公告栏', '公告欄')}</span>
@@ -155,12 +171,6 @@ export const TASK_TRACKER_TEMPLATE = `
                         <label class="ntt-check">
                             <input v-model="task.hasRfc" type="checkbox" @click.stop>
                             ${wgULS('挂RfC', '掛RfC')}
-                            <strong
-                                v-if="rfcMismatchLabel(task)"
-                                class="ntt-rfc-mismatch"
-                            >
-                                {{ rfcMismatchLabel(task) }}
-                            </strong>
                             <a
                                 v-if="canOpenRfcEditor(task)"
                                 href="#"
@@ -171,12 +181,6 @@ export const TASK_TRACKER_TEMPLATE = `
                         <label class="ntt-check">
                             <input v-model="task.hasBulletin" type="checkbox" @click.stop>
                             ${wgULS('挂公告栏', '掛公告欄')}
-                            <strong
-                                v-if="bulletinMismatchLabel(task)"
-                                class="ntt-bulletin-mismatch"
-                            >
-                                {{ bulletinMismatchLabel(task) }}
-                            </strong>
                         </label>
                         <label class="ntt-check">
                             <input v-model="task.isPublicNotice" type="checkbox" @click.stop>
@@ -206,6 +210,22 @@ export const TASK_TRACKER_TEMPLATE = `
                         <span v-if="publicNoticeLabel(task)" :class="{ 'ntt-warning': isPublicNoticeOverdue(task) }">
                             · {{ publicNoticeLabel(task) }}
                         </span>
+                    </div>
+                    <div v-if="taskWarnings(task).length" class="ntt-task-warnings">
+                        <strong
+                            v-for="warning in taskWarnings(task)"
+                            :key="warning.key"
+                            class="ntt-warning"
+                        >
+                            {{ warning.text }}
+                            <a
+                                v-if="warning.link"
+                                :href="warning.link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                @click.stop
+                            >Module:Delete/data</a>
+                        </strong>
                     </div>
                 </div>
             </section>

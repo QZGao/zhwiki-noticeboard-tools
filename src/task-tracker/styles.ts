@@ -84,7 +84,8 @@ export function injectTaskTrackerStyles(): void {
                 font-weight: normal;
             }
             .ntt-task-summary__meta,
-            .ntt-task-flags {
+            .ntt-task-flags,
+            .ntt-task-warnings {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 8px;
@@ -160,14 +161,6 @@ export function injectTaskTrackerStyles(): void {
                 font-size: 0.875em;
             }
             .ntt-warning {
-                color: #b32424;
-                font-weight: 600;
-            }
-            .ntt-rfc-mismatch {
-                color: #b32424;
-                font-weight: 700;
-            }
-            .ntt-bulletin-mismatch {
                 color: #b32424;
                 font-weight: 700;
             }

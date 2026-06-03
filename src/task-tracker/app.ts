@@ -37,6 +37,17 @@ const stageSortOrder: Record<TaskStage, number> = {
     closed: 2,
 };
 
+const speedyDeleteTalkPageTitles = new Set([
+    'wikipedia talk:快速删除',
+    'wikipedia talk:快速刪除',
+]);
+
+type TaskWarning = {
+    key: string;
+    text: string;
+    link?: string;
+};
+
 export function createTaskTrackerApp(): object {
     return {
         name: 'NoticeboardTaskTracker',
@@ -332,6 +343,26 @@ export function createTaskTrackerApp(): object {
                 return detected
                     ? wgULS('（检测到已挂RfC）', '（檢測到已掛RfC）')
                     : wgULS('（检测到未挂RfC）', '（檢測到未掛RfC）');
+            },
+            speedyDeleteDataWarning(task: TrackedTask): TaskWarning | null {
+                if (!hasPublicNoticeEnded(task) || !isSpeedyDeleteTalkTask(task)) {
+                    return null;
+                }
+
+                return {
+                    key: 'speedy-delete-data',
+                    text: wgULS('公示结束后请修改', '公示結束後請修改'),
+                    link: `https://zh.wikipedia.org/wiki/${encodeWikiTitle('Module:Delete/data')}`,
+                };
+            },
+            taskWarnings(task: TrackedTask): TaskWarning[] {
+                const warnings: Array<TaskWarning | null> = [
+                    warningFromLabel('rfc-mismatch', this.rfcMismatchLabel(task)),
+                    warningFromLabel('bulletin-mismatch', this.bulletinMismatchLabel(task)),
+                    this.speedyDeleteDataWarning(task),
+                ].filter(Boolean);
+
+                return warnings as TaskWarning[];
             },
             canOpenRfcEditor(task: TrackedTask): boolean {
                 return findCurrentPageSection(task.pageTitle) !== null;
@@ -748,6 +779,27 @@ function targetFromTaskPageTitle(pageTitle: string): { pageTitle: string; sectio
         pageTitle: targetPageTitle,
         section,
     };
+}
+
+function isSpeedyDeleteTalkTask(task: TrackedTask): boolean {
+    const target = targetFromTaskPageTitle(task.pageTitle);
+    if (!target) {
+        return false;
+    }
+
+    return speedyDeleteTalkPageTitles.has(normalizeComparablePageTitle(target.pageTitle));
+}
+
+function warningFromLabel(key: string, text: string): TaskWarning | null {
+    return text ? { key, text } : null;
+}
+
+function normalizeComparablePageTitle(pageTitle: string): string {
+    return pageTitle
+        .trim()
+        .replace(/_/g, ' ')
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
 }
 
 function makePublicDays(wikitext: string): number {
