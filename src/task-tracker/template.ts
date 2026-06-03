@@ -201,6 +201,12 @@ export const TASK_TRACKER_TEMPLATE = `
                                 class="ntt-field-link"
                                 @click.prevent.stop="dehydrateComparisonTemplate(task)"
                             >${wgULS('脱水「比较条文」', '脫水「比較條文」')}</a>
+                            <a
+                                v-if="canOpenDeleteDataSandboxEditor(task)"
+                                href="#"
+                                class="ntt-field-link"
+                                @click.prevent.stop="openDeleteDataSandboxEditor"
+                            >${wgULS('覆盖并编辑Module:Delete/data/sandbox', '覆蓋並編輯Module:Delete/data/sandbox')}</a>
                         </span>
                         <textarea v-model="task.notes" @click.stop></textarea>
                     </label>

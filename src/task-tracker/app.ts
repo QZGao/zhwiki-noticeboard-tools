@@ -41,6 +41,8 @@ const speedyDeleteTalkPageTitles = new Set([
     'wikipedia talk:快速删除',
     'wikipedia talk:快速刪除',
 ]);
+const deleteDataTitle = 'Module:Delete/data';
+const deleteDataSandboxTitle = 'Module:Delete/data/sandbox';
 
 type TaskWarning = {
     key: string;
@@ -331,6 +333,9 @@ export function createTaskTrackerApp(): object {
             canDehydrateComparisonTemplate(task: TrackedTask): boolean {
                 return this.comparisonTemplateStatusByPageTitle[task.pageTitle] === true;
             },
+            canOpenDeleteDataSandboxEditor(task: TrackedTask): boolean {
+                return task.stage !== 'closed' && isSpeedyDeleteTalkTask(task);
+            },
             stageLabel(stage: TaskStage): string {
                 return this.stageOptions.find((option: { value: TaskStage }) => option.value === stage)?.label || '提案';
             },
@@ -565,6 +570,36 @@ export function createTaskTrackerApp(): object {
                     mw.notify(this.statusMessage, { type: 'error' });
                 }
             },
+            async openDeleteDataSandboxEditor(): Promise<void> {
+                const targetName = `noticeboard-tools-delete-data-sandbox-${Date.now()}`;
+                const opened = window.open('about:blank', targetName);
+                if (opened) {
+                    opened.opener = null;
+                    opened.document.title = wgULS('正在载入编辑器', '正在載入編輯器');
+                    opened.document.body.textContent = wgULS('正在载入 Module:Delete/data 内容……', '正在載入 Module:Delete/data 內容……');
+                }
+
+                try {
+                    const content = await fetchCurrentWikitext(deleteDataTitle, null);
+                    openEditFormWithText(
+                        deleteDataSandboxTitle,
+                        content,
+                        wgULS('同步 Module:Delete/data', '同步 Module:Delete/data'),
+                        targetName,
+                    );
+                } catch (error) {
+                    console.error('Failed to open Module:Delete/data/sandbox editor:', error);
+                    this.statusMessage = wgULS(
+                        '载入 Module:Delete/data 失败：',
+                        '載入 Module:Delete/data 失敗：',
+                    ) + errorMessage(error);
+                    mw.notify(this.statusMessage, { type: 'error' });
+
+                    if (opened) {
+                        opened.close();
+                    }
+                }
+            },
             refreshCurrentPageRfcStatuses(): void {
                 for (const task of this.tasks) {
                     const section = findCurrentPageSection(task.pageTitle);
@@ -792,6 +827,40 @@ function isSpeedyDeleteTalkTask(task: TrackedTask): boolean {
 
 function warningFromLabel(key: string, text: string): TaskWarning | null {
     return text ? { key, text } : null;
+}
+
+function openEditFormWithText(
+    pageTitle: string,
+    text: string,
+    summary: string,
+    targetName: string,
+): void {
+    const form = document.createElement('form');
+    form.method = 'post';
+    form.action = mw.util.getUrl(pageTitle, { action: 'submit' });
+    form.target = targetName;
+    form.style.display = 'none';
+
+    appendHiddenInput(form, 'wpTextbox1', text);
+    appendHiddenInput(form, 'wpSummary', summary);
+    appendHiddenInput(form, 'wpPreview', '1');
+
+    const csrfToken = mw.user.tokens.get('csrfToken');
+    if (csrfToken) {
+        appendHiddenInput(form, 'wpEditToken', csrfToken);
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+}
+
+function appendHiddenInput(form: HTMLFormElement, name: string, value: string): void {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
 }
 
 function normalizeComparablePageTitle(pageTitle: string): string {
