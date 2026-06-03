@@ -2,6 +2,7 @@ import type { SectionId } from './types';
 import {
     apiPostWithToken as mediaWikiApiPostWithToken,
     apiRequest as mediaWikiApiRequest,
+    fetchCompareWikitextDiff,
     revisionContent,
     type ApiParams,
     type ApiRevision,
@@ -103,23 +104,13 @@ export async function fetchWikitextDiff(
     pageTitle: string,
     newWikitext: string,
     section: SectionId | null,
+    options: { newSection?: boolean } = {},
 ): Promise<string> {
-    const resolvedSection = await resolveSectionIndex(pageTitle, section);
-    const params: ApiParams = {
-        action: 'query',
-        prop: 'revisions',
-        titles: pageTitle,
-        rvdifftotext: newWikitext,
-        rvdifftotextpst: true,
-        formatversion: '2',
-    };
-
-    if (resolvedSection !== null) {
-        params.rvsection = resolvedSection;
-    }
-
-    const data = await apiPost<QueryResponse>(params);
-    return data.query.pages[0]?.revisions?.[0]?.diff?.body || '';
+    const resolvedSection = options.newSection ? 'new' : await resolveSectionIndex(pageTitle, section);
+    return fetchCompareWikitextDiff(api, pageTitle, newWikitext, {
+        preSaveTransform: true,
+        section: resolvedSection,
+    });
 }
 
 export async function fetchLatestRevisionId(pageTitle: string): Promise<number> {

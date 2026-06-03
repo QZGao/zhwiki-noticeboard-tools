@@ -246,6 +246,17 @@ export function createProposedChangesEditorApp(): object {
                 this.isLoading = true;
                 this.statusMessage = '';
                 try {
+                    if (this.options.placement.type === 'new-section') {
+                        this.diffHtml = await fetchWikitextDiff(
+                            this.options.pageTitle,
+                            this.proposedWikitext.trim(),
+                            null,
+                            { newSection: true },
+                        );
+                        this.currentStep = 2;
+                        return;
+                    }
+
                     const section = placementSection(this.options.placement);
                     const currentWikitext = await fetchCurrentWikitext(this.options.pageTitle, section);
                     const placedWikitext = await buildPlacedWikitext(
@@ -278,11 +289,12 @@ export function createProposedChangesEditorApp(): object {
                         this.proposedWikitext,
                     );
                     const isNewSection = this.options.placement.type === 'new-section';
+                    const submittedWikitext = isNewSection ? this.proposedWikitext.trim() : placedWikitext;
 
                     await saveWikitextRevision(
                         this.options.pageTitle,
                         isNewSection ? 'new' : current.resolvedSection,
-                        isNewSection ? this.proposedWikitext.trim() : placedWikitext,
+                        submittedWikitext,
                         this.options.editSummary || this.dialogTitle,
                         current.basetimestamp,
                         current.curtimestamp,
@@ -290,9 +302,9 @@ export function createProposedChangesEditorApp(): object {
 
                     await this.options.onSaved?.({
                         pageTitle: this.options.pageTitle,
-                        section: current.resolvedSection,
+                        section: isNewSection ? 'new' : current.resolvedSection,
                         proposedWikitext: this.proposedWikitext,
-                        placedWikitext,
+                        placedWikitext: submittedWikitext,
                     });
 
                     this.isSaving = false;

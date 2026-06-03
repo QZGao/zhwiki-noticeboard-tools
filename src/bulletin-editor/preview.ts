@@ -1,5 +1,3 @@
-import type { ApiQueryResponse } from './types';
-
 export function showPreviewResult(parsedSummary: string, parsedText: string): void {
     $('.be-preview-boxes').hide();
     $('#be-summary-box').show();
@@ -8,11 +6,10 @@ export function showPreviewResult(parsedSummary: string, parsedText: string): vo
     $('#be-preview-body').html(parsedText);
 }
 
-export function showDiffResult(data: ApiQueryResponse, noChangeMessage: string): void {
+export function showDiffResult(diff: string, noChangeMessage: string): void {
     $('.be-preview-boxes').hide();
     $('#be-diff-box').show();
 
-    const diff = data.query.pages[0].revisions?.[0]?.diff?.body || '';
     if (diff === '') {
         $('#be-diff-nochange').text(noChangeMessage).show();
         $('#be-diff-body').hide();

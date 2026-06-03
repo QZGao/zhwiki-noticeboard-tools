@@ -3,9 +3,6 @@ export type ApiQueryPage = {
     revisions?: Array<{
         content: string;
         timestamp?: string;
-        diff?: {
-            body: string;
-        };
     }>;
 };
 

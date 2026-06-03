@@ -17,8 +17,11 @@ import {
     mergeMainText,
     parseBulletinRows,
 } from './wikitext';
-
-type ApiParams = Record<string, string | number | boolean | string[] | number[] | File | undefined>;
+import {
+    errorMessage,
+    fetchCompareWikitextDiff,
+    type ApiParams,
+} from '../mediawiki';
 
 export class BulletinEditor {
     private readonly api = new mw.Api();
@@ -170,19 +173,16 @@ export class BulletinEditor {
     }
 
     private diffPage(): void {
-        void this.api.post({
-            action: 'query',
-            prop: 'revisions',
-            titles: bulletinTitle,
-            rvdifftotext: this.currentBulletinText(),
-            formatversion: '2',
-        })
-            .done((data: ApiQueryResponse) => {
-                showDiffResult(data, wgULS('公告栏无变更', '公告欄無變更'));
+        void fetchCompareWikitextDiff(this.api, bulletinTitle, this.currentBulletinText())
+            .then((diff) => {
+                showDiffResult(diff, wgULS('公告栏无变更', '公告欄無變更'));
             })
-            .fail((error: string, result: unknown) => {
-                console.error('Failed to generate bulletin diff:', { error, result });
-                mw.notify(wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + error, { type: 'error' });
+            .catch((error: unknown) => {
+                console.error('Failed to generate bulletin diff:', error);
+                mw.notify(
+                    wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + errorMessage(error),
+                    { type: 'error' },
+                );
             });
     }
 
@@ -198,19 +198,18 @@ export class BulletinEditor {
                 const page = data.query.pages[0];
                 const text = page.missing ? '' : page.revisions?.[0]?.content || '';
 
-                void this.api.post({
-                    action: 'query',
-                    prop: 'revisions',
-                    titles: this.archiveTitle,
-                    rvdifftotext: this.currentArchiveText(text),
-                    formatversion: '2',
+                void fetchCompareWikitextDiff(this.api, this.archiveTitle, this.currentArchiveText(text), {
+                    fromWikitext: text,
                 })
-                    .done((diffData: ApiQueryResponse) => {
-                        showDiffResult(diffData, wgULS('存档页无变更', '存檔頁無變更'));
+                    .then((diff) => {
+                        showDiffResult(diff, wgULS('存档页无变更', '存檔頁無變更'));
                     })
-                    .fail((error: string, result: unknown) => {
-                        console.error('Failed to generate bulletin archive diff:', { error, result });
-                        mw.notify(wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + error, { type: 'error' });
+                    .catch((error: unknown) => {
+                        console.error('Failed to generate bulletin archive diff:', error);
+                        mw.notify(
+                            wgULS('生成差异时发生错误：', '產生差異時發生錯誤：') + errorMessage(error),
+                            { type: 'error' },
+                        );
                     });
             })
             .fail((error: string, result: unknown) => {

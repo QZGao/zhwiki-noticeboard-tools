@@ -26,7 +26,7 @@ export async function buildPlacedWikitext(
     }
 
     if (placement.type === 'new-section') {
-        return appendToPageEnd(existingWikitext, proposedWikitext);
+        return proposedWikitext.trim();
     }
 
     if (placement.type === 'append-section-start') {
@@ -47,19 +47,6 @@ function appendToSectionEnd(existingWikitext: string, proposedWikitext: string, 
     }
 
     return `${existingWikitext.replace(/\s*$/, '')}${separator}${proposed}\n`;
-}
-
-function appendToPageEnd(existingWikitext: string, proposedWikitext: string): string {
-    const proposed = proposedWikitext.trim();
-    if (!proposed) {
-        return existingWikitext;
-    }
-
-    if (!existingWikitext.trim()) {
-        return `${proposed}\n`;
-    }
-
-    return `${existingWikitext.replace(/\s*$/, '')}\n\n${proposed}\n`;
 }
 
 function appendToSectionStart(existingWikitext: string, proposedWikitext: string, separator = '\n'): string {

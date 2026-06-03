@@ -4,15 +4,24 @@ export type ApiRevision = {
     content?: string;
     timestamp?: string;
     revid?: number;
-    diff?: {
-        body?: string;
-    };
     slots?: {
         main?: {
             content?: string;
             '*': string;
         };
     };
+};
+
+type ApiCompareResponse = {
+    compare?: {
+        body?: string;
+    };
+};
+
+export type CompareWikitextDiffOptions = {
+    fromWikitext?: string;
+    preSaveTransform?: boolean;
+    section?: string | null;
 };
 
 export function createLazyApi(): () => any {
@@ -33,6 +42,39 @@ export function revisionContent(revision: ApiRevision): string {
 
 export function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+export async function fetchCompareWikitextDiff(
+    api: any,
+    pageTitle: string,
+    newWikitext: string,
+    options: CompareWikitextDiffOptions = {},
+): Promise<string> {
+    const params: ApiParams = {
+        action: 'compare',
+        fromtitle: pageTitle,
+        totitle: pageTitle,
+        toslots: 'main',
+        'totext-main': newWikitext,
+        prop: 'diff',
+        formatversion: '2',
+    };
+
+    if (options.fromWikitext !== undefined) {
+        params.fromslots = 'main';
+        params['fromtext-main'] = options.fromWikitext;
+    }
+
+    if (options.preSaveTransform) {
+        params.topst = true;
+    }
+
+    if (options.section !== null && options.section !== undefined) {
+        params['tosection-main'] = options.section;
+    }
+
+    const data = await apiRequest<ApiCompareResponse>(api, 'post', params);
+    return data.compare?.body || '';
 }
 
 export function apiRequest<T>(api: any, method: 'get' | 'post', params: ApiParams): Promise<T> {
